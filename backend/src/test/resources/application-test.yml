@@ -1,0 +1,38 @@
+# ============================================================
+# 测试 Profile（test）
+# 使用 H2 内存库（PostgreSQL 兼容模式）驱动健康检查 / 契约测试，
+# 使 SpringBootTest 不依赖本地/容器 PostgreSQL 也能全绿。
+# ============================================================
+spring:
+  datasource:
+    # LOCK_TIMEOUT 放宽到 10s：并发 CAS 扣减同一行时，等待事务提交后
+    # 再重估 WHERE stock >= ? 条件，避免 MVStore 默认 1s 锁等待超时误报。
+    url: jdbc:h2:mem:yuzhuang;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE;LOCK_TIMEOUT=10000
+    username: sa
+    password: ""
+    hikari:
+      pool-name: YuzhuangTestHikariCP
+      # 放大连接池，让 30 线程并发下单测试在数据库层形成真实并行事务，
+      # 充分验证 CAS 乐观锁在并发下的防超卖语义（连接不够会被 Hikari 排队稀释并行度）。
+      maximum-pool-size: 20
+
+  # 测试环境启动即执行 H2 兼容表结构（幂等 CREATE TABLE IF NOT EXISTS）
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema-test.sql
+
+# 测试环境关闭 Outbox → Redis Streams 后台链路（定时 Sweeper / 消费者 / Stream 监听容器），
+# 避免无 Redis 依赖的 @SpringBootTest 在启动时建立连接；该异步链路由
+# OutboxRedisStreamIntegrationTest 以 Mockito 隔离方式验证发布/消费/状态闭环。
+yuzhuang:
+  outbox:
+    enabled: false
+
+mybatis-plus:
+  global-config:
+    banner: false
+
+logging:
+  level:
+    com.yuzhuang: debug

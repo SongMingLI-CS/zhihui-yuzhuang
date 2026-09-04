@@ -1,0 +1,152 @@
+# 智汇于庄 · 本地基础设施与业务服务编排
+# 已激活：PostgreSQL / Redis / Nginx 网关 / backend / ai-service / h5 / web
+#
+# 容器网络 rural-network 内以【服务名】互访（Docker 内嵌 DNS）：
+#   postgres:5432  redis:6379  backend:8080  ai-service:8000
+# 宿主机映射：Postgres 5433（容器内 5432）/ Redis 6379 / Nginx 80。
+#
+# backend 的建表与种子数据（db/schema.sql + db/seed-data.sql）通过环境变量
+# SPRING_SQL_INIT_* 在【容器启动时】触发，幂等（ON CONFLICT DO NOTHING），
+# 不影响本地 H2 测试上下文。
+
+services:
+  postgres:
+    image: ankane/pgvector:latest
+    container_name: rural-revitalization-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rural_revitalization}
+      POSTGRES_USER: ${POSTGRES_USER:-rural_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rural_password}
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      # 宿主 5433 -> 容器 5432（沿用既有部署约定；如需改动请显式导出 POSTGRES_PORT）
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - rural-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: rural-revitalization-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - rural-network
+
+  gateway:
+    image: nginx:1.27-alpine
+    container_name: rural-revitalization-gateway
+    restart: unless-stopped
+    ports:
+      - "${GATEWAY_PORT:-80}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - rural-network
+
+  backend:
+    build:
+      context: ../backend
+    image: yuzhuang-backend:local
+    container_name: rural-revitalization-backend
+    restart: unless-stopped
+    environment:
+      # 容器内以服务名 postgres / redis 访问（relaxed binding 覆盖 application.yml 默认值）
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-rural_revitalization}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-rural_user}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-rural_password}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      # 容器启动自举：建表 + 幂等种子数据（仅本服务注入，不影响本地 H2 测试）
+      SPRING_SQL_INIT_MODE: always
+      SPRING_SQL_INIT_SCHEMA_LOCATIONS: classpath:db/schema.sql
+      SPRING_SQL_INIT_DATA_LOCATIONS: classpath:db/seed-data.sql
+      # Outbox -> Redis Streams 可靠投递开关（Redis 不可达时组件自动降级，不阻断启动）
+      OUTBOX_ENABLED: "true"
+      SERVER_PORT: "8080"
+      TZ: ${TZ:-Asia/Shanghai}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - rural-network
+
+  ai-service:
+    build:
+      context: ../ai-service
+    image: yuzhuang-ai-service:local
+    container_name: rural-revitalization-ai
+    restart: unless-stopped
+    environment:
+      # 容器内通过 compose 网络以服务名 postgres 访问数据库
+      DATABASE_URL: postgresql://${POSTGRES_USER:-rural_user}:${POSTGRES_PASSWORD:-rural_password}@postgres:5432/${POSTGRES_DB:-rural_revitalization}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      # 离线 embedding：留空则使用内置降级（sentence-transformers 未装时自动 Mock），
+      # 保证无外网/无 Key 也能健康启动。
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-https://api.openai.com/v1}
+      TZ: ${TZ:-Asia/Shanghai}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - rural-network
+
+  # ===================== B 端中枢大脑（Next.js PC 数据大屏，网关 /b/ 对外） =====================
+  web:                         # B 端管理中台与数据大屏；经网关 /b/ 反代本服务:3000
+    build:
+      context: ../web
+    image: yuzhuang-web:local
+    container_name: rural-revitalization-web
+    restart: unless-stopped
+    environment:
+      # NEXT_PUBLIC_* 为构建期常量：代码默认 '/api/v1' 与 '/ai/v1'（网关同源相对路径），
+      # 浏览器直连网关即可，无需在此注入；如需覆盖请在 docker build 期传 build args。
+      TZ: ${TZ:-Asia/Shanghai}
+    networks:
+      - rural-network
+
+  h5:                          # C 端消费引流（轻量 H5，静态托管；网关 /h5/ 反代本服务:80）
+    build:
+      context: ../h5
+    image: yuzhuang-h5:local
+    container_name: rural-revitalization-h5
+    restart: unless-stopped
+    networks:
+      - rural-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  rural-network:
+    driver: bridge

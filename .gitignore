@@ -1,0 +1,50 @@
+# ===== 通用 =====
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+
+# ===== Java / Spring Boot (backend) =====
+backend/target/
+backend/build/
+*.class
+*.jar
+!.mvn/wrapper/*.jar
+backend/.mvn/wrapper/maven-wrapper.jar
+
+# ===== Python / FastAPI (ai-service) =====
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+ai-service/*.egg-info/
+
+# ===== Node / Next.js (web, h5) =====
+node_modules/
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# ===== Flutter (mobile) =====
+mobile/.dart_tool/
+mobile/build/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/.packages
+mobile/pubspec.lock
+
+# ===== IDE =====
+.idea/
+.vscode/
+*.iml
+
+# ===== 数据库/本地数据 =====
+*.sqlite3
+*.dump

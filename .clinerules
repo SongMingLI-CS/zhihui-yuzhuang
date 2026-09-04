@@ -1,0 +1,6 @@
+# 智汇于庄 (Zhihui Yuzhuang) - Roo Code 开发规则
+
+1. 严禁越界修改：处理某一模块时（如 backend/），严禁随意修改其他模块（如 ai-service/、web/）的文件。
+2. 契约至上：所有接口 DTO、字段命名与业务状态码，必须严格对齐 docs/api-spec.yaml。
+3. 容器环境感知：数据库主机名为 rural-revitalization-postgres，Redis 主机名为 rural-revitalization-redis，网络共享 rural-network。
+4. 交付验证闭环：每完成一个子任务，必须通过终端执行编译命令（如 mvn clean compile 或 pytest）验证语法与依赖正确性，确认无报错后再交付。

@@ -1,0 +1,22 @@
+# ============================================================
+# 本地开发 Profile（dev）
+# 宿主 5432 被占用，Docker Postgres 映射在宿主端口 5433，
+# 故 dev 默认走 localhost:5433；仍允许环境变量整体覆盖。
+# 用法：SPRING_PROFILES_ACTIVE=dev mvn spring-boot:run
+# ============================================================
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5433}/${POSTGRES_DB:rural_revitalization}}
+    username: ${POSTGRES_USER:rural_user}
+    password: ${POSTGRES_PASSWORD:rural_password}
+
+  # 本地 Redis 默认宿主 localhost:6379；如需连容器/远端经 REDIS_HOST/REDIS_PORT 注入
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+logging:
+  level:
+    com.yuzhuang: debug

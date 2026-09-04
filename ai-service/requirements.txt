@@ -1,0 +1,22 @@
+# 智汇于庄 · ai-service (FastAPI 大模型 / RAG 服务) 依赖清单
+# Python 3.11+（本地验证环境 3.13.3）
+
+# --- Web 框架 ---
+fastapi>=0.115.0,<1.0.0
+uvicorn[standard]>=0.32.0,<1.0.0
+
+# --- 数据校验 / 配置 ---
+pydantic>=2.9.0,<3.0.0
+pydantic-settings>=2.6.0,<3.0.0
+python-dotenv>=1.0.1,<2.0.0
+
+# --- PostgreSQL + pgvector（业务库 / 向量库共用）---
+# psycopg[binary,pool]：psycopg3 二进制驱动 + psycopg_pool 连接池
+psycopg[binary,pool]>=3.2.3,<4.0.0
+pgvector>=0.3.6,<1.0.0
+
+# --- DeepSeek / OpenAI 兼容 SDK（LLM + Embedding）---
+openai>=1.55.0,<2.0.0
+
+# --- 可选：PDF 解析（未安装时切片器会给出安装提示，不影响 txt/md 入库）---
+# pypdf>=4.0.0,<6.0.0

@@ -1,0 +1,19 @@
+# ===== 依赖与构建产物 =====
+node_modules/
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# ===== 环境与本地 =====
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# ===== 通用 =====
+.DS_Store
+*.log
+npm-debug.log*

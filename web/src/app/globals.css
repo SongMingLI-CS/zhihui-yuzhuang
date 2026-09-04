@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  @apply bg-[#eef1ec] font-sans text-slate-800 antialiased;
+}
+
+/* 细滚动条：数据表格 / 实时流水通用 */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.35) transparent;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 116, 139, 0.35);
+  border-radius: 9999px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 大屏数字等宽字体增强可读性 */
+.num {
+  font-family: theme('fontFamily.digit');
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* 通用面板卡片 */
+.panel {
+  @apply rounded-2xl border border-slate-200/80 bg-white shadow-sm;
+}

@@ -1,0 +1,74 @@
+# ============================================================
+# 智汇于庄 backend · 主配置
+# 默认值为【容器/Docker 网络】语义（见 .clinerules）：
+#   - PostgreSQL 主机 rural-revitalization-postgres（容器内）
+#   - Redis 主机 rural-revitalization-redis（部署时经 REDIS_HOST 注入；
+#     本地开发默认 localhost:6379）
+# 本地开发请激活 dev profile（application-dev.yml，宿主 localhost:5433）。
+# 所有关键参数均可通过环境变量注入并带有默认值。
+# ============================================================
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+spring:
+  application:
+    name: backend
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://${POSTGRES_HOST:rural-revitalization-postgres}:${POSTGRES_PORT:5432}/${POSTGRES_DB:rural_revitalization}}
+    username: ${POSTGRES_USER:rural_user}
+    password: ${POSTGRES_PASSWORD:rural_password}
+    hikari:
+      pool-name: YuzhuangHikariCP
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:20}
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      connection-test-query: SELECT 1
+
+  # Redis（Redis Streams 可靠事件投递）——容器内主机 rural-revitalization-redis 由
+  # REDIS_HOST 注入；本地默认 localhost:6379。连接为惰性建立，无操作不占连接。
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 5s
+      connect-timeout: 5s
+
+  jackson:
+    time-zone: Asia/Shanghai
+
+mybatis-plus:
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+# ============================================================
+# 智汇于庄 Outbox → Redis Streams 可靠投递（调度/幂等旋钮）
+# enabled=false 时禁用后台 Sweeper/消费者/Stream 监听（测试环境隔离）。
+# ============================================================
+yuzhuang:
+  outbox:
+    enabled: ${OUTBOX_ENABLED:true}
+    scan-interval-ms: ${OUTBOX_SCAN_INTERVAL_MS:2000}
+    batch-size: ${OUTBOX_BATCH_SIZE:50}
+    max-retry: ${OUTBOX_MAX_RETRY:5}
+
+logging:
+  level:
+    com.yuzhuang: info
+  pattern:
+    level: "%5p [%X{requestId:-}] [%X{tenantId:-}]"
