@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { Bot, FileSearch, Quote, Send, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { askAgri, toApiError } from '@/lib/http';
+import { askAgriStreaming, toApiError } from '@/lib/http';
 import { AGRI_QUICK_QUESTIONS } from '@/lib/demo';
 import { newDemoRequestId } from '@/lib/format';
 import { getTenant } from '@/lib/tenant';
@@ -148,36 +148,22 @@ export function QaDrawer({ open, onClose, initialQuestion }: QaDrawerProps) {
     ]);
     setStarted(true);
     setPending(true);
+    const assistantId = nextMsgId();
+    setMsgs((prev) => [...prev, { id: assistantId, role: 'assistant', content: '', citations: [], requestId }]);
 
     try {
-      const data = await askAgri({
+      const data = await askAgriStreaming({
         question: text,
         category,
         sessionId: sessionRef.current,
+      }, {
+        onToken: (token) => setMsgs((prev) => prev.map((msg) => msg.id === assistantId ? { ...msg, content: msg.content + token } : msg)),
+        onCitations: (citations) => setMsgs((prev) => prev.map((msg) => msg.id === assistantId ? { ...msg, citations } : msg)),
       });
-      setMsgs((prev) => [
-        ...prev,
-        {
-          id: nextMsgId(),
-          role: 'assistant',
-          content: data.answer,
-          citations: data.citations ?? [],
-          disclaimer: data.disclaimer,
-          requestId,
-        },
-      ]);
+      setMsgs((prev) => prev.map((msg) => msg.id === assistantId ? { ...msg, citations: data.citations ?? [], disclaimer: data.disclaimer } : msg));
     } catch (err) {
       const e = toApiError(err);
-      setMsgs((prev) => [
-        ...prev,
-        {
-          id: nextMsgId(),
-          role: 'assistant',
-          content: `${e.message}（${e.code}）`,
-          error: true,
-          requestId,
-        },
-      ]);
+      setMsgs((prev) => prev.map((msg) => msg.id === assistantId ? { ...msg, content: `${e.message}（${e.code}）`, error: true } : msg));
     } finally {
       setPending(false);
     }

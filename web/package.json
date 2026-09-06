@@ -9,9 +9,11 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run src"
+    ,"test:e2e": "playwright test"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.102.8",
     "axios": "^1.7.7",
     "echarts": "^5.5.1",
     "echarts-for-react": "^3.0.2",
@@ -21,6 +23,8 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63.0",
     "@types/node": "^22.7.4",
     "@types/react": "^18.3.10",
     "@types/react-dom": "^18.3.0",

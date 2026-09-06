@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { MapPin, RefreshCw, ShieldCheck, Truck, X, Zap } from 'lucide-react';
 import type { OrderCheckoutResponse, Product } from '../types/api';
 import { checkoutOrder, toApiError } from '../lib/http';
@@ -40,7 +41,11 @@ export default function CheckoutDrawer({
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [submitting, setSubmitting] = useState(false);
+  const queryClient = useQueryClient();
+  const checkoutMutation = useMutation({
+    mutationFn: ({ payload, key }: { payload: Parameters<typeof checkoutOrder>[0]; key: string }) => checkoutOrder(payload, key),
+  });
+  const submitting = checkoutMutation.isPending;
   const nameRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
   const addressRef = useRef<HTMLTextAreaElement>(null);
@@ -110,7 +115,6 @@ export default function CheckoutDrawer({
     }
     if (submitting) return;
 
-    setSubmitting(true);
     const payload = {
       orderSource: ORDER_SOURCE,
       remark: 'C端H5秒杀场',
@@ -118,9 +122,10 @@ export default function CheckoutDrawer({
       receiverAddress: { recipientName: name, phone: tel, detailedAddress: addr },
     };
     try {
-      const resp = await checkoutOrder(payload, genIdempotencyKey());
+      const resp = await checkoutMutation.mutateAsync({ payload, key: genIdempotencyKey() });
       toast('success', '下单成功，正在生成订单…');
       onSuccess(resp);
+      void queryClient.invalidateQueries({ queryKey: ['products'] });
     } catch (err) {
       const apiErr = toApiError(err);
       // 契约：库存售罄 409 / B2001 → 指定话术
@@ -130,8 +135,6 @@ export default function CheckoutDrawer({
       } else {
         toast('error', apiErr.message || '下单失败，请稍后重试');
       }
-    } finally {
-      setSubmitting(false);
     }
   };
 

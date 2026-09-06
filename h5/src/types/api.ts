@@ -11,6 +11,8 @@ export interface ApiResponse<T> {
   requestId: string;
 }
 
+export interface PageResult<T> { items: T[]; page: number; pageSize: number; total: number; totalPages: number }
+
 /* ===================== 特产商品（GET /api/v1/products） ===================== */
 
 export interface Product {

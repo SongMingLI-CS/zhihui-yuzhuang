@@ -9,6 +9,7 @@ export const TENANT_ID = 'tenant_yuzhuang_001';
 
 export const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1';
 export const AI_BASE = import.meta.env.VITE_AI_BASE ?? '/ai/v1';
+export const AI_STREAMING_ENABLED = import.meta.env.VITE_AI_STREAMING_ENABLED === 'true';
 
 /** 下单渠道来源（枚举严格对齐契约 H5_PRIVATE / DOUYIN / KUAISHOU / B2B_PORTAL） */
 export const ORDER_SOURCE = 'H5_PRIVATE' as const;

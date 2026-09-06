@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
-import { ToastProvider } from './ui/Toast';
+import { Providers } from './Providers';
 
 /** 全局壳：左侧深色导航 + 右侧顶栏/内容区 */
 export function AppShell({ children }: { children: ReactNode }) {
@@ -23,7 +23,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [menuOpen]);
 
   return (
-    <ToastProvider>
+    <Providers>
       <div className="flex h-dvh overflow-hidden bg-[var(--canvas)]">
         <div className="hidden lg:block"><Sidebar /></div>
         {menuOpen && (
@@ -46,6 +46,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           </main>
         </div>
       </div>
-    </ToastProvider>
+    </Providers>
   );
 }

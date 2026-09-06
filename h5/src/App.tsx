@@ -1,49 +1,29 @@
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, BadgeCheck, MapPin, RefreshCw, ShoppingBasket, Sprout, Truck, Wheat } from 'lucide-react';
 import TopBar from './components/TopBar';
 import HeroBanner from './components/HeroBanner';
 import CountdownStrip from './components/CountdownStrip';
 import ProductCard from './components/ProductCard';
-import CheckoutDrawer from './components/CheckoutDrawer';
-import OrderSuccessModal, { type SuccessData } from './components/OrderSuccessModal';
-import AgriQA from './components/AgriQA';
-import { ToastProvider } from './components/Toast';
+import type { SuccessData } from './components/OrderSuccessModal';
+import Providers from './components/Providers';
+import OfflineNotice from './components/OfflineNotice';
 import type { OrderCheckoutResponse, Product } from './types/api';
 import { fetchProducts, toApiError } from './lib/http';
 
+const CheckoutDrawer = lazy(() => import('./components/CheckoutDrawer'));
+const OrderSuccessModal = lazy(() => import('./components/OrderSuccessModal'));
+const AgriQA = lazy(() => import('./components/AgriQA'));
+
 /** 页面主体（子组件经 Context 使用 Toast） */
 function ShopPage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [buyTarget, setBuyTarget] = useState<Product | null>(null);
   const [success, setSuccess] = useState<SuccessData | null>(null);
-
-  const reload = useCallback(() => setRefreshKey((k) => k + 1), []);
-
-  // 拉取在售特产（GET /api/v1/products，X-Tenant-Id 由 http 层自动注入）
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    fetchProducts()
-      .then((list) => {
-        if (!cancelled) setProducts(list);
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setProducts([]);
-          setError(toApiError(err).message);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshKey]);
+  const productsQuery = useQuery({ queryKey: ['products'], queryFn: fetchProducts });
+  const products = productsQuery.data ?? [];
+  const loading = productsQuery.isPending;
+  const error = productsQuery.error ? toApiError(productsQuery.error).message : null;
+  const reload = () => { void productsQuery.refetch(); };
 
   const handleBuy = (p: Product) => setBuyTarget(p);
 
@@ -60,6 +40,7 @@ function ShopPage() {
 
   return (
     <div className="min-h-screen">
+      <OfflineNotice />
       <TopBar />
 
       <div className="shop-layout">
@@ -163,26 +144,26 @@ function ShopPage() {
       </div>
 
       {/* 确认下单抽屉 */}
-      <CheckoutDrawer
+      <Suspense fallback={null}><CheckoutDrawer
         product={buyTarget}
         onClose={() => setBuyTarget(null)}
         onSuccess={handleOrderSuccess}
         onSoldOut={handleSoldOut}
-      />
+      /></Suspense>
 
       {/* 抢购成功弹窗 */}
-      <OrderSuccessModal data={success} onClose={() => setSuccess(null)} />
+      <Suspense fallback={null}><OrderSuccessModal data={success} onClose={() => setSuccess(null)} /></Suspense>
 
       {/* 农技 AI 问答悬浮球 */}
-      <AgriQA />
+      <Suspense fallback={null}><AgriQA /></Suspense>
     </div>
   );
 }
 
 export default function App() {
   return (
-    <ToastProvider>
+    <Providers>
       <ShopPage />
-    </ToastProvider>
+    </Providers>
   );
 }

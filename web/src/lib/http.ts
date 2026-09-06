@@ -1,5 +1,5 @@
 import axios, { type AxiosResponse } from 'axios';
-import { AI_BASE, API_BASE, AI_QA_TIMEOUT, AI_MARKETING_TIMEOUT, GATEWAY_BASE } from './config';
+import { AI_BASE, API_BASE, AI_QA_TIMEOUT, AI_MARKETING_TIMEOUT, AI_STREAMING_ENABLED, GATEWAY_BASE } from './config';
 import { getTenant } from './tenant';
 import type {
   AgriQARequest,
@@ -25,8 +25,22 @@ export class ApiError extends Error {
 /** 与 h5 同源请求实例：全量注入当前多租户标识 X-Tenant-Id */
 const http = axios.create({ timeout: 30_000 });
 
+const ACCESS_TOKEN_KEY = 'yuzhuang.access_token';
+
+export function setAccessToken(token: string | null): void {
+  if (typeof window === 'undefined') return;
+  if (token) window.localStorage.setItem(ACCESS_TOKEN_KEY, token);
+  else window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+}
+
+function getAccessToken(): string | null {
+  return typeof window === 'undefined' ? null : window.localStorage.getItem(ACCESS_TOKEN_KEY);
+}
+
 http.interceptors.request.use((config) => {
   config.headers.set('X-Tenant-Id', getTenant().id);
+  const token = getAccessToken();
+  if (token) config.headers.set('Authorization', `Bearer ${token}`);
   return config;
 });
 
@@ -63,6 +77,48 @@ export async function askAgri(payload: AgriQARequest): Promise<AgriQAResponse> {
     timeout: AI_QA_TIMEOUT,
   });
   return unwrap(res);
+}
+
+export interface StreamCallbacks {
+  onToken: (token: string) => void;
+  onCitations?: (citations: AgriQAResponse['citations']) => void;
+  signal?: AbortSignal;
+}
+
+/** SSE 能力适配：后端开通 /qa/ask/stream 后仅需打开环境变量；当前默认安全回退 JSON。 */
+export async function askAgriStreaming(payload: AgriQARequest, callbacks: StreamCallbacks): Promise<AgriQAResponse> {
+  if (!AI_STREAMING_ENABLED) {
+    const data = await askAgri(payload);
+    callbacks.onToken(data.answer);
+    callbacks.onCitations?.(data.citations);
+    return data;
+  }
+  const token = getAccessToken();
+  const response = await fetch(`${AI_BASE}/qa/ask/stream`, {
+    method: 'POST', signal: callbacks.signal,
+    headers: { 'Content-Type': 'application/json', 'X-Tenant-Id': getTenant().id, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok || !response.body) throw new ApiError('流式问答连接失败', `HTTP_${response.status}`, response.status);
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = ''; let answer = ''; let citations: AgriQAResponse['citations'] = [];
+  let reading = true;
+  while (reading) {
+    const { done, value } = await reader.read();
+    if (done) { reading = false; continue; }
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split('\n\n'); buffer = events.pop() ?? '';
+    for (const event of events) {
+      const raw = event.split('\n').filter((line) => line.startsWith('data:')).map((line) => line.slice(5).trim()).join('\n');
+      if (!raw || raw === '[DONE]') continue;
+      const parsed = JSON.parse(raw) as { token?: string; citations?: AgriQAResponse['citations']; message?: string };
+      if (parsed.message) throw new ApiError(parsed.message, 'STREAM_ERROR');
+      if (parsed.token) { answer += parsed.token; callbacks.onToken(parsed.token); }
+      if (parsed.citations) { citations = parsed.citations; callbacks.onCitations?.(citations); }
+    }
+  }
+  return { answer, citations };
 }
 
 /* ===================== 特产营销生成（POST /ai/v1/marketing/generate） ===================== */

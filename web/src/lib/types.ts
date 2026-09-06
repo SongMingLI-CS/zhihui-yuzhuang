@@ -12,6 +12,9 @@ export interface ApiResponse<T> {
   requestId: string;
 }
 
+/** 后端列表接口启用后的统一分页形状；当前 UI 可先使用同构的客户端分页。 */
+export interface PageResult<T> { items: T[]; page: number; pageSize: number; total: number; totalPages: number }
+
 /* ===================== 特产商品（GET /api/v1/products） ===================== */
 
 export interface Product {

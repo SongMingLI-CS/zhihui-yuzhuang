@@ -8,6 +8,7 @@
  */
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? '/api/v1';
 export const AI_BASE = process.env.NEXT_PUBLIC_AI_BASE ?? '/ai/v1';
+export const AI_STREAMING_ENABLED = process.env.NEXT_PUBLIC_AI_STREAMING_ENABLED === 'true';
 /** 网关原生存活探针（根路径 /healthz），开发环境可留空由当前源承载 */
 export const GATEWAY_BASE = process.env.NEXT_PUBLIC_GATEWAY_BASE ?? '';
 

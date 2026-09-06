@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bot, Loader2, MessageCircle, Send, Sparkles, X } from 'lucide-react';
 import type { Citation } from '../types/api';
-import { askAgri, toApiError } from '../lib/http';
+import { askAgriStreaming, toApiError } from '../lib/http';
 import { AGRI_QUICK_QUESTIONS } from '../config';
 import { useToast } from './Toast';
 
@@ -69,12 +69,13 @@ export default function AgriQA() {
     setMessages((prev) => [...prev, { role: 'user', text: question }]);
     setInput('');
     setLoading(true);
+    const answerIndex = messages.length + 1;
+    setMessages((prev) => [...prev, { role: 'ai', text: '', citations: [] }]);
     try {
-      const res = await askAgri({ question, sessionId });
-      setMessages((prev) => [
-        ...prev,
-        { role: 'ai', text: res.answer, citations: res.citations },
-      ]);
+      await askAgriStreaming({ question, sessionId }, {
+        onToken: (token) => setMessages((prev) => prev.map((message, index) => index === answerIndex ? { ...message, text: message.text + token } : message)),
+        onCitations: (citations) => setMessages((prev) => prev.map((message, index) => index === answerIndex ? { ...message, citations } : message)),
+      });
     } catch (err) {
       const apiErr = toApiError(err);
       toast('error', apiErr.message || 'AI 农技服务暂时不可用，请稍后再试');
