@@ -55,7 +55,7 @@
   - [ ] B 端登录页 + 认证态
   - [ ] B 端商品管理页
   - [x] 后端订单列表/详情聚合查询接口（`GET /orders` + `GET /orders/{orderNo}`，含分页/状态/渠道过滤与租户隔离）
-  - [ ] B 端前端接入真实订单列表/分页（当前仍为演示快照 `demo.ts`）
+  - [ ] B 端前端接入真实订单列表/分页（⚠️ 依赖后端履约状态/出库接口建模：前端订单页为履约看板 PICKING→READY→SHIPPED，与后端 `OrderStatus` 交易状态域 PENDING_PAY→STOCK_CONFIRMED→PROCESSING→COMPLETED 不一致，需先对齐状态契约再接入）
 - [x] OpenAPI 文档（Springdoc + `docs/api-spec.yaml`，当前契约覆盖 `/orders/checkout`、`/qa/ask`）
 
 **完成标准：** Postman 可完成 用户登录 → 创建商品 → 下单 → 扣减库存的闭环。◐ 部分达成（下单/扣库存闭环已通，登录与商品创建缺失）
