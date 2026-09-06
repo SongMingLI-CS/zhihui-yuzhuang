@@ -95,7 +95,7 @@
 - [x] 文本切片 → Embedding 向量化 → 入库管线（`ingest_docs.py` / `scripts/seed_rag.sh`，幂等）
   - [ ] PDF 解析器（当前 `data/raw_docs` 为 `.txt` 属地文档，PDF → 结构化切片未落地）
 - [x] 向量召回（pgvector 余弦相似度 + 租户回退 + 分类二次过滤 + 阈值/ top_k 截断）
-  - [ ] 关键词召回（BM25/全文索引）与双路融合重排（当前仅向量召回单路）
+  - [x] 关键词召回（中文 2-gram + ILIKE 匹配）与双路融合重排（RRF，`search_hybrid`）
 - [x] DeepSeek 接入 + 强约束防幻觉 Prompt + 引用溯源（无 Key 时离线 Mock 模板兜底）
 - [ ] 语音转写接口（预留 ASR 适配）
 - [x] 多智能体编排（Trend→Copywriter→Compliance；`POST /ai/v1/marketing/generate` 真实调用）
