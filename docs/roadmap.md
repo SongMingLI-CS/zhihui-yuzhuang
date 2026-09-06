@@ -54,7 +54,8 @@
 - [x] `web/` B 端：订单列表/履约看板（响应式；当前依赖演示快照 `web/src/lib/demo.ts`）
   - [ ] B 端登录页 + 认证态
   - [ ] B 端商品管理页
-  - [ ] B 端真实后端列表/分页接口接入（`GET /orders` 等只读聚合接口尚未实现）
+  - [x] 后端订单列表/详情聚合查询接口（`GET /orders` + `GET /orders/{orderNo}`，含分页/状态/渠道过滤与租户隔离）
+  - [ ] B 端前端接入真实订单列表/分页（当前仍为演示快照 `demo.ts`）
 - [x] OpenAPI 文档（Springdoc + `docs/api-spec.yaml`，当前契约覆盖 `/orders/checkout`、`/qa/ask`）
 
 **完成标准：** Postman 可完成 用户登录 → 创建商品 → 下单 → 扣减库存的闭环。◐ 部分达成（下单/扣库存闭环已通，登录与商品创建缺失）
@@ -114,7 +115,7 @@
 - [x] `web/` 数据大屏：Dashboard/Knowledge/Agents/Orders 四页 + 响应式 + 无障碍 + E2E（管理端数据现为演示快照，待后端只读聚合接口就绪后替换为真实 Query）
 - [ ] 微信授权（openid）接入 H5 私域下单
 - [x] 后端统一下单 API（`POST /orders/checkout`，H5/App 共用，已对齐 `docs/api-spec.yaml`）
-  - [ ] 后端订单列表/详情聚合查询 API（`GET /orders` 等，供三端查询/分页）
+  - [x] 后端订单列表/详情聚合查询 API（`GET /orders` + `GET /orders/{orderNo}`，已对齐 docs/api-spec.yaml）
 
 **完成标准：** 三端均可访问同一后端；移动端弱网可用；大屏数据实时刷新。◐ 部分达成（B/C 端已通，M 端未启动、大屏为快照）
 
