@@ -28,6 +28,8 @@ import {
   type OrderStatus,
 } from '@/lib/demo';
 import { formatCNY, formatInt } from '@/lib/format';
+import { usePagination } from '@/hooks/usePagination';
+import { Pagination } from '@/components/ui/Pagination';
 
 /** 状态 → 徽标语义（仅前端展示层） */
 const STATUS_TONE: Record<OrderStatus, 'green' | 'amber' | 'red' | 'blue' | 'slate' | 'violet'> = {
@@ -60,6 +62,7 @@ export default function OrdersPage() {
   const [rows, setRows] = useState<OrderRow[]>(ORDERS);
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'ALL'>('ALL');
   const [query, setQuery] = useState('');
+  const pagination = usePagination(5);
 
   const statusCount = useMemo(() => {
     const map = new Map<OrderStatus, number>();
@@ -90,6 +93,9 @@ export default function OrdersPage() {
       );
     });
   }, [rows, statusFilter, query]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pagination.pageSize));
+  const activePage = Math.min(pagination.page, pageCount);
+  const pageRows = filtered.slice((activePage - 1) * pagination.pageSize, activePage * pagination.pageSize);
 
   const shipOut = (id: number) => {
     const target = rows.find((row) => row.id === id);
@@ -238,7 +244,7 @@ export default function OrdersPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r) => (
+              {pageRows.map((r) => (
                 <tr
                   key={r.id}
                   className="group border-b border-slate-50 transition-colors last:border-0 hover:bg-brand-50/30"
@@ -306,7 +312,7 @@ export default function OrdersPage() {
           </table>
         </div>
         <div className="divide-y divide-slate-100 md:hidden">
-          {filtered.map((r) => (
+          {pageRows.map((r) => (
             <article key={r.id} className="p-4">
               <div className="flex items-start gap-3">
                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600">{SOURCE_ICON[r.source] ?? <Smartphone size={15} />}</span>
@@ -328,6 +334,7 @@ export default function OrdersPage() {
           ))}
           {filtered.length === 0 && <EmptyBlock>没有匹配订单，请调整筛选条件。</EmptyBlock>}
         </div>
+        {filtered.length > 0 && <Pagination page={activePage} pageSize={pagination.pageSize} total={filtered.length} onPageChange={pagination.setPage} onPageSizeChange={pagination.setPageSize} />}
       </Card>
 
       {/* 待出库队列（出库就绪单，可一键出库） */}

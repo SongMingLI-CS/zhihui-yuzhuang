@@ -10,6 +10,7 @@ import {
 } from '@/lib/config';
 import type { StreamEvent, StreamLevel } from '@/lib/demo';
 import { formatTime } from '@/lib/format';
+import { DangerConfirmDialog } from '@/components/ui/DangerConfirmDialog';
 
 /* ===================== 实时流水（Redis Streams 异步消费语义 · 客户端模拟） =====================
  * 说明：无 SSE/WS 推送端点（backend 未暴露流订阅），此处按 Redis Streams 的
@@ -162,6 +163,7 @@ export function RealtimeFeed({
 }: RealtimeFeedProps) {
   const [events, setEvents] = useState<StreamEvent[]>([]);
   const [paused, setPaused] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
   const [stat, setStat] = useState<FeedStats>({ total: 0, perMin: baseline });
 
   const seqRef = useRef(0);
@@ -257,7 +259,7 @@ export function RealtimeFeed({
           </button>
           <button
             type="button"
-            onClick={clearFeed}
+            onClick={() => setConfirmClear(true)}
             className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-600 transition hover:border-red-200 hover:text-red-500"
           >
             <RotateCcw size={12} />
@@ -265,6 +267,8 @@ export function RealtimeFeed({
           </button>
         </div>
       </div>
+
+      <DangerConfirmDialog open={confirmClear} title="清空当前事件流？" description="当前浏览器中的实时流水记录将被清空，新的事件仍会继续进入。" confirmLabel="确认清屏" countdownSeconds={2} onCancel={() => setConfirmClear(false)} onConfirm={() => { clearFeed(); setConfirmClear(false); }} />
 
       {/* 事件流 */}
       {events.length === 0 ? (
