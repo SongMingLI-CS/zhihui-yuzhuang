@@ -43,13 +43,13 @@
 - [x] `backend/` Spring Boot 工程骨架（单模块、统一响应 `ApiResponse`、全局异常 `GlobalExceptionHandler`、链路/租户 Filter、健康探针）
   - [ ] 多模块拆分（演进项，非阻塞，当前按单模块继续演进）
 - [x] 领域模型建表：商品/SKU（含库存 `stock`/`version`）、订单 `t_order`、订单明细 `t_order_item`、发件箱 `t_outbox_event`（`schema.sql`，PG + H2 兼容）
-  - [ ] 租户元数据表 `t_tenant`（名称/渠道配置/状态）
-  - [ ] 用户/账号/角色权限表 `t_user`（农户/合作社/村委）
+  - [x] 租户元数据表 `t_tenant`（名称/属地/状态）
+  - [x] 用户/账号/角色权限表 `t_user`（农户/合作社/村委，PBKDF2 密码哈希）
 - [x] 商品读接口 `GET /api/v1/products`（租户在售 ∪ 全局共享）、`GET /api/v1/products/{id}`；库存种子初始化（`seed-data.sql` 幂等 + `deploy/seed-realistic-data.sql`）
   - [ ] 商品管理写接口（上架/编辑/下架 SKU → B 端商品管理页）
 - [x] 下单接口 `POST /api/v1/orders/checkout`（事务内扣库存，已含 CAS + 幂等 + Outbox，见阶段 2）
 - [x] 租户上下文（`X-Tenant-Id` → `TenantContextFilter`/`TenantContext` → MDC）
-  - [ ] JWT 认证 + 登录接口（`ResultCode` 已预留 A1002/A1003 契约位，代码未实现）
+  - [x] JWT 认证 + 登录接口（`POST /api/v1/auth/login`，HS256 手写 JWT + 认证 Filter + PBKDF2 哈希，演示账号 admin/coop001/farmer001）
   - [ ] MyBatis-Plus 自动行级租户隔离（现为手工传 `tenant_id`，未引入 `TenantLineInnerInterceptor`）
 - [x] `web/` B 端：订单列表/履约看板（响应式；当前依赖演示快照 `web/src/lib/demo.ts`）
   - [ ] B 端登录页 + 认证态
