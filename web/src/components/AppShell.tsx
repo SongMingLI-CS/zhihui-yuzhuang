@@ -34,7 +34,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               onClick={() => { setMenuOpen(false); menuButtonRef.current?.focus(); }}
               aria-label="关闭导航"
             />
-            <div className="relative h-full w-[min(84vw,300px)] animate-fade-in">
+            <div className="relative h-full w-[244px] max-w-[84vw] animate-fade-in">
               <Sidebar mobile onNavigate={() => { setMenuOpen(false); menuButtonRef.current?.focus(); }} />
             </div>
           </div>

@@ -38,6 +38,7 @@ export default function AgriQA() {
   // 锁背景滚动
   useEffect(() => {
     if (!open) return;
+    const trigger = triggerRef.current;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const timer = window.setTimeout(() => inputRef.current?.focus(), 120);
@@ -49,7 +50,7 @@ export default function AgriQA() {
       document.body.style.overflow = prev;
       window.clearTimeout(timer);
       document.removeEventListener('keydown', onKeyDown);
-      triggerRef.current?.focus();
+      trigger?.focus();
     };
   }, [open]);
 

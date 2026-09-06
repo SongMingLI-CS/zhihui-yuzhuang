@@ -9,7 +9,6 @@ import { lastNDays } from './format';
  * 待对应聚合接口在 backend/ai-service 就绪后，由各页面的真实请求原位替换即可。
  * 所有『流式事件』均为客户端对 Redis Streams 消费语义的模拟（无 SSE/WS 推送端点）。
  */
-export const DEMO_NOTE = '演示快照 · 待对应聚合接口就绪后自动替换为实时数据';
 
 /* ===================== 顶部指标卡 ===================== */
 
