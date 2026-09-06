@@ -52,7 +52,7 @@
   - [x] JWT 认证 + 登录接口（`POST /api/v1/auth/login`，HS256 手写 JWT + 认证 Filter + PBKDF2 哈希，演示账号 admin/coop001/farmer001）
   - [ ] MyBatis-Plus 自动行级租户隔离（现为手工传 `tenant_id`，未引入 `TenantLineInnerInterceptor`）
 - [x] `web/` B 端：订单列表/履约看板（响应式；当前依赖演示快照 `web/src/lib/demo.ts`）
-  - [ ] B 端登录页 + 认证态
+  - [x] B 端登录页 + 认证态（`/login`，顶栏用户区 + 退出，Bearer Token 持久化）
   - [ ] B 端商品管理页
   - [x] 后端订单列表/详情聚合查询接口（`GET /orders` + `GET /orders/{orderNo}`，含分页/状态/渠道过滤与租户隔离）
   - [ ] B 端前端接入真实订单列表/分页（⚠️ 依赖后端履约状态/出库接口建模：前端订单页为履约看板 PICKING→READY→SHIPPED，与后端 `OrderStatus` 交易状态域 PENDING_PAY→STOCK_CONFIRMED→PROCESSING→COMPLETED 不一致，需先对齐状态契约再接入）
