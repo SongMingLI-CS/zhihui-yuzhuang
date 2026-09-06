@@ -46,7 +46,7 @@
   - [x] 租户元数据表 `t_tenant`（名称/属地/状态）
   - [x] 用户/账号/角色权限表 `t_user`（农户/合作社/村委，PBKDF2 密码哈希）
 - [x] 商品读接口 `GET /api/v1/products`（租户在售 ∪ 全局共享）、`GET /api/v1/products/{id}`；库存种子初始化（`seed-data.sql` 幂等 + `deploy/seed-realistic-data.sql`）
-  - [ ] 商品管理写接口（上架/编辑/下架 SKU → B 端商品管理页）
+  - [x] 商品管理写接口（上架/编辑/下架 SKU）+ B 端商品管理页（`/products`）
 - [x] 下单接口 `POST /api/v1/orders/checkout`（事务内扣库存，已含 CAS + 幂等 + Outbox，见阶段 2）
 - [x] 租户上下文（`X-Tenant-Id` → `TenantContextFilter`/`TenantContext` → MDC）
   - [x] JWT 认证 + 登录接口（`POST /api/v1/auth/login`，HS256 手写 JWT + 认证 Filter + PBKDF2 哈希，演示账号 admin/coop001/farmer001）
