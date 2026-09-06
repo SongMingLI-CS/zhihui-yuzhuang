@@ -9,6 +9,8 @@ import type {
   AuthLoginResponse,
   MarketingGenerateRequest,
   MarketingGenerateResponse,
+  Product,
+  ProductUpsertRequest,
 } from './types';
 
 /** 业务/网络错误统一封装（携带契约 code 与 HTTP 状态） */
@@ -76,6 +78,28 @@ export function toApiError(err: unknown): ApiError {
 
 export async function login(payload: AuthLoginRequest): Promise<AuthLoginResponse> {
   const res = await http.post<ApiResponse<AuthLoginResponse>>(`${API_BASE}/auth/login`, payload);
+  return unwrap(res);
+}
+
+/* ===================== 商品管理（GET/POST/PUT/PATCH /api/v1/products） ===================== */
+
+export async function listProducts(): Promise<Product[]> {
+  const res = await http.get<ApiResponse<Product[]>>(`${API_BASE}/products`);
+  return unwrap(res);
+}
+
+export async function createProduct(payload: ProductUpsertRequest): Promise<Product> {
+  const res = await http.post<ApiResponse<Product>>(`${API_BASE}/products`, payload);
+  return unwrap(res);
+}
+
+export async function updateProduct(id: number, payload: ProductUpsertRequest): Promise<Product> {
+  const res = await http.put<ApiResponse<Product>>(`${API_BASE}/products/${id}`, payload);
+  return unwrap(res);
+}
+
+export async function updateProductStatus(id: number, status: string): Promise<Product> {
+  const res = await http.patch<ApiResponse<Product>>(`${API_BASE}/products/${id}/status`, { status });
   return unwrap(res);
 }
 

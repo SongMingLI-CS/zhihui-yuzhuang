@@ -3,6 +3,7 @@ import {
   BookOpen,
   Bot,
   Package,
+  PackagePlus,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -23,6 +24,13 @@ export const NAV_ITEMS: NavItem[] = [
     short: '产业治理大盘',
     description: '经营指标 · 销售趋势 · 实时削峰流水',
     icon: BarChart3,
+  },
+  {
+    href: '/products',
+    label: '商品管理',
+    short: '商品管理',
+    description: '特产上架 · 编辑 · 上下架',
+    icon: PackagePlus,
   },
   {
     href: '/knowledge',

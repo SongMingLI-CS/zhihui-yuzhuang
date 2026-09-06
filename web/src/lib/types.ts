@@ -29,6 +29,18 @@ export interface Product {
   imageUrl: string;
 }
 
+export interface ProductUpsertRequest {
+  skuCode: string;
+  spuName: string;
+  price: number;
+  stock: number;
+  status?: string;
+}
+
+export interface ProductStatusRequest {
+  status: string;
+}
+
 /* ===================== 农技问答（POST /ai/v1/qa/ask） ===================== */
 
 export type AgriCategory = 'DISEASE_PEST' | 'FERTILIZER' | 'POLICY' | 'GENERAL';
