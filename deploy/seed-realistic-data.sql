@@ -15,7 +15,7 @@
 --      读接口恰好返回 3 款，避免跨租户重复扩容导致 6 款）；
 --   2) 最近 7 天 50 条真实感订单（收货地覆盖 鹿邑县城 / 试量镇各村 / 郑州 / 开封，
 --      时间落在 19:00~22:00 直播带货波峰，呈 ECharts 波浪曲线），状态覆盖
---      PENDING_PAY / STOCK_CONFIRMED / PROCESSING / PAID / SHIPPED / COMPLETED / CANCELLED；
+--      PENDING_PAY / STOCK_CONFIRMED / PROCESSING / COMPLETED / CANCELLED；履约轴另见 fulfillment_status
 --   3) 与 50 条订单一一对应的 Outbox 事件（PROCESSED 为主 + 3 条 PUBLISHED 模拟刚投递）。
 --
 -- 幂等设计（可安全重复执行）：
@@ -146,7 +146,7 @@ WITH base AS (
             '村口广播团购，到于庄村自提点取货',
             '返乡游子给家中长辈寄的年货'
         ])[((n - 1) % 8) + 1]                            AS remark,
-        -- 状态覆盖：旧单 COMPLETED/CANCELLED → SHIPPED → PAID → 新单
+        -- 交易状态覆盖：旧单 COMPLETED/CANCELLED → PROCESSING/STOCK_CONFIRMED → 新单 PENDING_PAY/STOCK_CONFIRMED
         CASE
             WHEN (ARRAY[
                 0,0,0,
@@ -165,7 +165,7 @@ WITH base AS (
                 4,4,4,4,4,4,
                 5,5,5,5,5,5,5,5,5,
                 6,6,6,6,6,6,6,6
-            ])[n] = 4 THEN 'SHIPPED'
+            ])[n] = 4 THEN CASE WHEN n % 6 = 0 THEN 'PROCESSING' ELSE 'COMPLETED' END
             WHEN (ARRAY[
                 0,0,0,
                 1,1,1,1,1,1,1,1,
@@ -174,7 +174,7 @@ WITH base AS (
                 4,4,4,4,4,4,
                 5,5,5,5,5,5,5,5,5,
                 6,6,6,6,6,6,6,6
-            ])[n] = 3 THEN CASE WHEN n % 6 = 0 THEN 'CANCELLED' ELSE 'SHIPPED' END
+            ])[n] = 3 THEN CASE WHEN n % 5 = 0 THEN 'COMPLETED' ELSE 'PROCESSING' END
             WHEN (ARRAY[
                 0,0,0,
                 1,1,1,1,1,1,1,1,
@@ -183,7 +183,7 @@ WITH base AS (
                 4,4,4,4,4,4,
                 5,5,5,5,5,5,5,5,5,
                 6,6,6,6,6,6,6,6
-            ])[n] = 2 THEN CASE WHEN n % 5 = 0 THEN 'PROCESSING' ELSE 'PAID' END
+            ])[n] = 2 THEN CASE WHEN n % 3 = 0 THEN 'STOCK_CONFIRMED' ELSE 'PROCESSING' END
             WHEN (ARRAY[
                 0,0,0,
                 1,1,1,1,1,1,1,1,
@@ -192,9 +192,58 @@ WITH base AS (
                 4,4,4,4,4,4,
                 5,5,5,5,5,5,5,5,5,
                 6,6,6,6,6,6,6,6
-            ])[n] = 1 THEN CASE WHEN n % 4 = 0 THEN 'STOCK_CONFIRMED' ELSE 'PAID' END
+            ])[n] = 1 THEN CASE WHEN n % 3 = 0 THEN 'PROCESSING' ELSE 'STOCK_CONFIRMED' END
             ELSE CASE WHEN n % 2 = 0 THEN 'PENDING_PAY' ELSE 'STOCK_CONFIRMED' END
         END                                             AS status,
+        -- 履约状态（出库流水轴 · 独立于交易 status）：PENDING/PICKING/READY/SHIPPED/ABNORMAL，供 B 端看板/出库队列驱动
+        CASE
+            WHEN (ARRAY [
+                0,0,0,
+                1,1,1,1,1,1,1,1,
+                2,2,2,2,2,2,2,
+                3,3,3,3,3,3,3,3,3,
+                4,4,4,4,4,4,
+                5,5,5,5,5,5,5,5,5,
+                6,6,6,6,6,6,6,6
+            ])[n] IN (5, 6) THEN 'SHIPPED'
+            WHEN (ARRAY [
+                0,0,0,
+                1,1,1,1,1,1,1,1,
+                2,2,2,2,2,2,2,
+                3,3,3,3,3,3,3,3,3,
+                4,4,4,4,4,4,
+                5,5,5,5,5,5,5,5,5,
+                6,6,6,6,6,6,6,6
+            ])[n] = 4 THEN CASE WHEN n % 6 = 0 THEN 'READY' ELSE 'SHIPPED' END
+            WHEN (ARRAY [
+                0,0,0,
+                1,1,1,1,1,1,1,1,
+                2,2,2,2,2,2,2,
+                3,3,3,3,3,3,3,3,3,
+                4,4,4,4,4,4,
+                5,5,5,5,5,5,5,5,5,
+                6,6,6,6,6,6,6,6
+            ])[n] = 3 THEN CASE WHEN n % 5 = 0 THEN 'PICKING' ELSE 'READY' END
+            WHEN (ARRAY [
+                0,0,0,
+                1,1,1,1,1,1,1,1,
+                2,2,2,2,2,2,2,
+                3,3,3,3,3,3,3,3,3,
+                4,4,4,4,4,4,
+                5,5,5,5,5,5,5,5,5,
+                6,6,6,6,6,6,6,6
+            ])[n] = 2 THEN CASE WHEN n % 7 = 0 THEN 'ABNORMAL' WHEN n % 4 = 0 THEN 'READY' ELSE 'PICKING' END
+            WHEN (ARRAY [
+                0,0,0,
+                1,1,1,1,1,1,1,1,
+                2,2,2,2,2,2,2,
+                3,3,3,3,3,3,3,3,3,
+                4,4,4,4,4,4,
+                5,5,5,5,5,5,5,5,5,
+                6,6,6,6,6,6,6,6
+            ])[n] = 1 THEN CASE WHEN n % 4 = 0 THEN 'READY' ELSE 'PICKING' END
+            ELSE 'PENDING'
+        END                                             AS fulfillment_status,
         -- 明细组合（确定性取模：1~3 行，行 2/行 3 覆盖多商品礼包）
         ((n - 1) % 3) + 1                               AS idx1,
         ((n * 7) % 3) + 1                               AS qty1,
@@ -227,7 +276,7 @@ item_lines AS (
 ins_orders AS (
     INSERT INTO t_order (
         tenant_id, order_no, idempotency_key, order_source,
-        total_amount, status, recipient_name, recipient_phone,
+        total_amount, status, fulfillment_status, recipient_name, recipient_phone,
         detailed_address, remark, created_at
     )
     SELECT
@@ -242,6 +291,7 @@ ins_orders AS (
              ON p.sku_code = il.sku_code AND p.tenant_id = 'global'
           WHERE il.n = b.n)                                      AS total_amount,
         b.status,
+        b.fulfillment_status,
         b.recipient_name,
         b.recipient_phone,
         b.detailed_address,
