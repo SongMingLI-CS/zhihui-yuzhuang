@@ -16,10 +16,12 @@ import {
 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { EmptyBlock } from '@/components/ui/StateView';
+import { useToast } from '@/components/ui/Toast';
 import { cn } from '@/lib/cn';
 import {
   CHANNEL_LABELS_SHORT,
-  DEMO_NOTE,
   ORDER_STATUS_LABELS,
   ORDERS,
   type OrderRow,
@@ -54,6 +56,7 @@ const SOURCE_ICON: Record<string, ReactNode> = {
 };
 
 export default function OrdersPage() {
+  const { notify } = useToast();
   const [rows, setRows] = useState<OrderRow[]>(ORDERS);
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'ALL'>('ALL');
   const [query, setQuery] = useState('');
@@ -89,9 +92,13 @@ export default function OrdersPage() {
   }, [rows, statusFilter, query]);
 
   const shipOut = (id: number) => {
+    const target = rows.find((row) => row.id === id);
     setRows((prev) =>
       prev.map((r) => (r.id === id && r.status === 'READY' ? { ...r, status: 'SHIPPED' } : r)),
     );
+    if (target?.status === 'READY') {
+      notify('success', '出库完成', `${target.orderNo} 已进入已出库流水。`);
+    }
   };
 
   // 出库流水：最新 READY/SHIPPED 记录（演示「出库就绪 → 已出库」流转）
@@ -104,23 +111,16 @@ export default function OrdersPage() {
   );
 
   return (
-    <div className="flex flex-col gap-5 p-5">
-      {/* 页头 */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div>
-          <h2 className="text-lg font-bold text-slate-800">订单与出库流水</h2>
-          <p className="mt-0.5 text-xs text-slate-400">
-            渠道订单聚合 · 履约状态机（入库 → 备货 → 出库就绪 → 出库）
-          </p>
-        </div>
-        <Badge tone="amber" className="ml-auto hidden md:inline-flex">
-          <Info size={12} />
-          {DEMO_NOTE}
-        </Badge>
-      </div>
+    <div className="page-stack">
+      <PageHeader
+        eyebrow="ORDER FULFILLMENT"
+        title="订单与出库流水"
+        description="聚合私域、直播与集采订单，沿履约状态快速定位待办和异常。"
+        actions={<Badge tone="amber"><Info size={12} />演示数据</Badge>}
+      />
 
       {/* 概览指标 */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
           icon={<Warehouse size={18} />}
           iconCls="bg-brand-50 text-brand-600"
@@ -154,7 +154,7 @@ export default function OrdersPage() {
         subtitle="订单削峰写流 → 异步消费 → 状态机推进 · 出库流水（演示）"
         bodyClassName="p-0"
       >
-        <div className="scrollbar-thin flex items-stretch gap-2 overflow-x-auto px-5 py-4">
+        <div className="scrollbar-thin flex items-stretch gap-2 overflow-x-auto px-4 py-4 sm:px-5" role="group" aria-label="按履约状态筛选">
           {STATUS_ORDER.map((s, i) => {
             const n = statusCount.get(s) ?? 0;
             const isLast = i === STATUS_ORDER.length - 1;
@@ -163,6 +163,7 @@ export default function OrdersPage() {
                 <button
                   type="button"
                   onClick={() => setStatusFilter(s)}
+                  aria-pressed={statusFilter === s}
                   className={cn(
                     'w-[132px] rounded-2xl border px-3 py-2.5 text-left transition',
                     s === 'ABNORMAL'
@@ -207,18 +208,24 @@ export default function OrdersPage() {
         subtitle="全渠道聚合 · 含 B2B 集采 · 就绪单支持演示出库"
         bodyClassName="p-0"
         actions={
-          <div className="relative">
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            {statusFilter !== 'ALL' && (
+              <button type="button" onClick={() => setStatusFilter('ALL')} className="min-h-9 shrink-0 rounded-xl px-2.5 text-xs font-semibold text-brand-700 hover:bg-brand-50">清除筛选</button>
+            )}
+            <div className="relative min-w-0 flex-1 sm:flex-none">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-300" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="搜索单号 / 商品 / 渠道"
-              className="h-8 w-56 rounded-lg border border-slate-200 bg-white pl-8 pr-2 text-xs text-slate-600 outline-none transition placeholder:text-slate-300 focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+              aria-label="搜索订单"
+              className="control h-9 w-full pl-8 pr-2 text-xs text-slate-700 placeholder:text-slate-400 sm:w-60"
             />
+            </div>
           </div>
         }
       >
-        <div className="scrollbar-thin overflow-x-auto">
+        <div className="scrollbar-thin hidden overflow-x-auto md:block">
           <table className="w-full min-w-[940px] text-left text-sm">
             <thead>
               <tr className="border-b border-slate-100 text-[11px] uppercase tracking-wide text-slate-400">
@@ -298,6 +305,29 @@ export default function OrdersPage() {
             </tbody>
           </table>
         </div>
+        <div className="divide-y divide-slate-100 md:hidden">
+          {filtered.map((r) => (
+            <article key={r.id} className="p-4">
+              <div className="flex items-start gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600">{SOURCE_ICON[r.source] ?? <Smartphone size={15} />}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <div><p className="num text-xs font-bold text-slate-800">{r.orderNo}</p><p className="mt-1 text-[11px] text-slate-400">{CHANNEL_LABELS_SHORT[r.source] ?? r.source} · {r.createdAt}</p></div>
+                    <Badge tone={STATUS_TONE[r.status]} dot>{ORDER_STATUS_LABELS[r.status]}</Badge>
+                  </div>
+                  <p className="mt-3 text-sm font-medium leading-5 text-slate-700">{r.skuName}</p>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-xs text-slate-500">数量 ×{r.qty}</span>
+                    <span className="num text-sm font-bold text-slate-900">{formatCNY(r.amount)}</span>
+                  </div>
+                  {r.status === 'READY' && <button type="button" onClick={() => shipOut(r.id)} className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-brand-700 px-3 text-xs font-semibold text-white"><Truck size={13} />立即出库</button>}
+                  {r.status === 'ABNORMAL' && <p className="mt-3 flex items-center gap-1 text-xs font-medium text-red-600"><AlertTriangle size={13} />需人工介入</p>}
+                </div>
+              </div>
+            </article>
+          ))}
+          {filtered.length === 0 && <EmptyBlock>没有匹配订单，请调整筛选条件。</EmptyBlock>}
+        </div>
       </Card>
 
       {/* 待出库队列（出库就绪单，可一键出库） */}
@@ -312,7 +342,7 @@ export default function OrdersPage() {
             {outboundRows.map((r) => (
               <li
                 key={r.id}
-                className="flex flex-wrap items-center gap-3 px-5 py-3 transition-colors hover:bg-slate-50/60"
+                className="flex flex-wrap items-center gap-3 px-4 py-3.5 transition-colors hover:bg-slate-50/60 sm:px-5"
               >
                 <span
                   className={cn(
