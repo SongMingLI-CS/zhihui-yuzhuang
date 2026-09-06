@@ -48,6 +48,103 @@ paths:
                   requestId: "req-err-001"
 
   # ==========================================
+  # 商品管理写接口 (Spring Boot)
+  # ==========================================
+  /products:
+    post:
+      summary: 上架新商品
+      operationId: createProduct
+      parameters:
+        - in: header
+          name: X-Tenant-Id
+          required: false
+          schema:
+            type: string
+            default: "global"
+          description: 多租户标识（缺省 global）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductUpsertRequest'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/ProductSkuResponse'
+        '409':
+          $ref: '#/components/responses/StandardErrorResponse'
+
+  /products/{id}:
+    put:
+      summary: 编辑商品
+      operationId: updateProduct
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductUpsertRequest'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/ProductSkuResponse'
+        '404':
+          $ref: '#/components/responses/StandardErrorResponse'
+
+  /products/{id}/status:
+    patch:
+      summary: 商品上下架切换
+      operationId: updateProductStatus
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductStatusRequest'
+      responses:
+        '200':
+          description: 切换成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/ProductSkuResponse'
+        '404':
+          $ref: '#/components/responses/StandardErrorResponse'
+
+  # ==========================================
   # 特产下单接口 (Spring Boot)
   # ==========================================
   /orders/checkout:
@@ -296,6 +393,82 @@ components:
               type: string
               enum: [FARMER, COOPERATIVE, VILLAGE]
               example: "VILLAGE"
+
+    # 商品上架/编辑请求模型
+    ProductUpsertRequest:
+      type: object
+      required:
+        - skuCode
+        - spuName
+        - price
+        - stock
+      properties:
+        skuCode:
+          type: string
+          maxLength: 64
+          example: "SKU1004"
+        spuName:
+          type: string
+          maxLength: 255
+          example: "于庄石磨黑芝麻香油"
+        price:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+          example: 58.00
+        stock:
+          type: integer
+          minimum: 0
+          example: 300
+        status:
+          type: string
+          enum: [ON_SALE, OFF_SHELF]
+          default: "ON_SALE"
+          example: "ON_SALE"
+
+    # 商品上下架请求模型
+    ProductStatusRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [ON_SALE, OFF_SHELF]
+          example: "OFF_SHELF"
+
+    # 商品响应模型
+    ProductSkuResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1001
+        skuCode:
+          type: string
+          example: "SKU1001"
+        spuName:
+          type: string
+          example: "鹿邑试量传统石磨小磨香油（500ml）"
+        price:
+          type: number
+          format: double
+          example: 68.00
+        stock:
+          type: integer
+          example: 800
+        status:
+          type: string
+          enum: [ON_SALE, OFF_SHELF]
+          example: "ON_SALE"
+        tenantId:
+          type: string
+          example: "global"
+        description:
+          type: string
+        imageUrl:
+          type: string
 
     # 基础统一响应包
     ApiResponse:

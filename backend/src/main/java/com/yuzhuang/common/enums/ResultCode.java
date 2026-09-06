@@ -35,6 +35,8 @@ public enum ResultCode {
     IDEMPOTENT_CONFLICT("B2002", "订单处理中，请勿重复提交", HttpStatus.CONFLICT),
     /** 订单状态已被并发变更 */
     ORDER_STATE_CONFLICT("B2003", "订单状态已更新，请刷新后重试", HttpStatus.CONFLICT),
+    /** SKU 编码重复 */
+    SKU_CODE_CONFLICT("B2004", "SKU 编码已存在", HttpStatus.CONFLICT),
 
     // ==================== C5 系统 / 依赖 ====================
     /** 系统内部错误兜底 */
