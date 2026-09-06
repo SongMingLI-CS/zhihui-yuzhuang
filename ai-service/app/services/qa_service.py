@@ -121,14 +121,23 @@ class AgriQAService:
             # 非法空问题：直接兜底（FastAPI 层 min_length=2 一般已拦截）
             return AgriQAResponse(answer=FALLBACK_ANSWER, citations=[], disclaimer=None)
 
-        # 1) 检索召回
-        hits = await self.retriever.search(
-            query_text=question,
-            tenant_id=tenant_id,
-            category=request.category,
-            top_k=self.top_k,
-            min_score=self.min_score,
-        )
+        # 1) 检索召回（双路召回：向量 + 关键词 RRF 融合；可由 rag_hybrid_enabled 降级为纯向量）
+        if getattr(self.settings, "rag_hybrid_enabled", True):
+            hits = await self.retriever.search_hybrid(
+                query_text=question,
+                tenant_id=tenant_id,
+                category=request.category,
+                top_k=self.top_k,
+                min_score=self.min_score,
+            )
+        else:
+            hits = await self.retriever.search(
+                query_text=question,
+                tenant_id=tenant_id,
+                category=request.category,
+                top_k=self.top_k,
+                min_score=self.min_score,
+            )
 
         # 2) 熔断判定：无任何切片达到 min_score -> 兜底，不请求 LLM
         if not hits:

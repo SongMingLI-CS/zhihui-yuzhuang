@@ -51,11 +51,13 @@ from app.db.session import (  # noqa: E402
     sync_pool,
 )
 from app.rag.embedder import Embedder  # noqa: E402
+from app.rag.keyword_retriever import KeywordRetriever  # noqa: E402
 from app.rag.retriever import KnowledgeRetriever  # noqa: E402
 from app.rag.splitter import DocumentSplitter  # noqa: E402
 from app.schemas.base import ApiResponse  # noqa: E402
 from app.schemas.qa import AgriQARequest, AgriQAResponse  # noqa: E402
 from app.services.qa_service import (  # noqa: E402
+    DEGRADE_ANSWER,
     FALLBACK_ANSWER,
     AgriQAService,
 )
@@ -275,6 +277,21 @@ async def _service_level_checks(samples: List[dict]) -> dict:
     assert 0.0 <= top["score"] <= 1.0, "score 需裁剪在 [0,1]"
     logger.info("召回命中 doc=%s score=%.4f 检索耗时=%.2fms", top["doc_title"], top["score"], latency_ms)
 
+    # ---- 1b) 关键词召回断言：自然语言问句应命中包含"纹枯/返青/小麦"的切片 ----
+    kw_retriever = KeywordRetriever()
+    kw_hits = await kw_retriever.search(
+        query_text=NATURAL_QUESTION,
+        tenant_id=TARGET_TENANT,
+        category=TARGET_CATEGORY,
+        top_k=3,
+        min_score=0.0,
+    )
+    assert kw_hits, "关键词召回应命中包含关键词的切片"
+    assert all(h["doc_title"] == TARGET_DOC for h in kw_hits), (
+        f"关键词召回应命中目标文档，实际 {[h['doc_title'] for h in kw_hits]}"
+    )
+    summary["keyword_recalled"] = len(kw_hits)
+
     # ---- 2) 服务级整片 query：应携带非空 citations ----
     resp_exact = await service.answer_question(
         AgriQARequest(question=query_exact, category=TARGET_CATEGORY),
@@ -293,9 +310,9 @@ async def _service_level_checks(samples: List[dict]) -> dict:
     )
     _assert_valid_response(resp_nat)
     if embedder.is_mock:
-        # 离线 Mock（哈希向量无语义）：自然语言无法达到阈值 → 熔断兜底，不请求 LLM
-        assert resp_nat.answer == FALLBACK_ANSWER, "Mock 下自然语言应返回熔断兜底回答"
-        assert resp_nat.citations == [], "Mock 熔断时 citations 应留空"
+        # 离线 Mock（向量无语义，但关键词召回可命中）→ 走降级（LLM 不可用），保留 citations
+        assert resp_nat.citations, "Mock 下自然语言应通过关键词召回命中依据"
+        assert resp_nat.answer == DEGRADE_ANSWER, "Mock 下自然语言应关键词召回后降级"
     else:
         # 在线真实 Embedding：自然语言问句应召回
         assert resp_nat.citations, "真实 Embedding 下自然语言问句应召回依据"

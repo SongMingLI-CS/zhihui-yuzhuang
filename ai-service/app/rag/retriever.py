@@ -29,6 +29,7 @@ from app.config import Settings, get_settings
 from app.db.init_tables import KNOWLEDGE_CHUNK_TABLE
 from app.db.session import Vector, connection
 from app.rag.embedder import Embedder, build_embedder
+from app.rag.keyword_retriever import KeywordRetriever
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,8 @@ class KnowledgeRetriever:
         cfg = settings or get_settings()
         self.settings = cfg
         self.embedder = embedder if embedder is not None else build_embedder()
+        self.keyword_retriever = KeywordRetriever(settings=cfg)
+        self.keyword_min_score = float(getattr(cfg, "rag_keyword_min_score", 0.3))
 
     @property
     def is_mock(self) -> bool:
@@ -136,6 +139,41 @@ class KnowledgeRetriever:
         )
         return hits
 
+    # ------------------------------------------------------------ 双路召回融合
+
+    async def search_hybrid(
+        self,
+        query_text: str,
+        tenant_id: str = "global",
+        category: Optional[str] = None,
+        top_k: int = DEFAULT_TOP_K,
+        min_score: float = DEFAULT_MIN_SCORE,
+    ) -> List[Dict[str, Any]]:
+        """双路召回（向量 + 关键词）并 RRF 融合重排。
+
+        向量召回与关键词召回各自取 ``top_k * 2`` 条候选，再用倒数排名融合（RRF）
+        合并去重，返回按融合分降序的前 ``top_k`` 条。每条命中的 ``score`` 保留其
+        原始相似度（向量余弦 / 关键词命中比例，均 ∈[0,1]），供 citation 的
+        ``similarityScore`` 使用；排序依据为融合后的 ``rrf`` 得分。
+        """
+        candidate_k = max(3, int(top_k) * 2)
+        vector_hits = await self.search(
+            query_text=query_text,
+            tenant_id=tenant_id,
+            category=category,
+            top_k=candidate_k,
+            min_score=min_score,
+        )
+        keyword_hits = await self.keyword_retriever.search(
+            query_text=query_text,
+            tenant_id=tenant_id,
+            category=category,
+            top_k=candidate_k,
+            min_score=self.keyword_min_score,
+        )
+        merged = reciprocal_rank_fusion([vector_hits, keyword_hits], k=RRF_K)
+        return merged[: max(1, int(top_k))]
+
     # ------------------------------------------------------------ SQL 组装
 
     def _build_search_sql(
@@ -186,7 +224,34 @@ LIMIT %(prefetch)s
 
 __all__ = [
     "KnowledgeRetriever",
+    "reciprocal_rank_fusion",
+    "RRF_K",
     "DEFAULT_TOP_K",
     "DEFAULT_MIN_SCORE",
     "GENERAL_CATEGORY",
 ]
+
+
+# RRF 融合常量（rank 越大贡献越小，k 控制平滑程度）
+RRF_K = 60
+
+
+def reciprocal_rank_fusion(
+    result_lists: List[List[Dict[str, Any]]], k: int = RRF_K
+) -> List[Dict[str, Any]]:
+    """倒数排名融合（RRF）：对多个召回列表按排名加权合并去重。
+
+    每个结果列表内按已有顺序（相似度/命中比例降序）作为排名，第 ``rank`` 位贡献
+    ``1/(k+rank+1)`` 分；同一 chunk 出现在多路时分数累加。返回按融合分降序的结果。
+    """
+    fused: Dict[Any, Dict[str, Any]] = {}
+    for lst in result_lists:
+        for rank, hit in enumerate(lst):
+            cid = hit.get("id")
+            if cid is None:
+                continue
+            if cid not in fused:
+                fused[cid] = dict(hit)
+                fused[cid]["rrf"] = 0.0
+            fused[cid]["rrf"] = fused[cid]["rrf"] + 1.0 / (k + rank + 1)
+    return sorted(fused.values(), key=lambda h: float(h["rrf"]), reverse=True)

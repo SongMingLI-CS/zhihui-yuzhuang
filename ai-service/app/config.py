@@ -67,6 +67,14 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-3-small"
     embedding_dim: int = Field(default=1536, ge=1, description="Embedding 向量维度")
 
+    # ---------- RAG 检索（双路召回）----------
+    rag_hybrid_enabled: bool = Field(
+        default=True, description="是否启用双路召回（向量 + 关键词 RRF 融合）"
+    )
+    rag_keyword_min_score: float = Field(
+        default=0.3, ge=0.0, le=1.0, description="关键词召回最小命中比例（0~1）"
+    )
+
     @computed_field  # type: ignore[misc]
     @property
     def deepseek_enabled(self) -> bool:
