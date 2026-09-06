@@ -22,6 +22,10 @@
         <java.version>17</java.version>
         <mybatis-plus.version>3.5.7</mybatis-plus.version>
         <springdoc.version>2.6.0</springdoc.version>
+        <!-- 覆盖 Spring Boot 3.3.5 父 POM 的 Lombok 1.18.34，升级到支持 JDK 25 的版本 -->
+        <lombok.version>1.18.38</lombok.version>
+        <!-- 覆盖父 POM 的 ByteBuddy 1.14.19，升级到支持 JDK 25 的版本（修复 Mockito mock 失败） -->
+        <byte-buddy.version>1.18.13</byte-buddy.version>
     </properties>
 
     <dependencies>
