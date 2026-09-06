@@ -237,7 +237,7 @@ export function RealtimeFeed({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* 工具栏 */}
-      <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-2.5">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-3 py-2.5 sm:gap-3 sm:px-4">
         <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
           <span className="h-1.5 w-1.5 animate-blink rounded-full bg-emerald-400" />
           实时削峰
@@ -275,7 +275,7 @@ export function RealtimeFeed({
         <div
           ref={bodyRef}
           onScroll={onBodyScroll}
-          className="scrollbar-thin h-[320px] flex-1 overflow-y-auto px-2 py-1"
+          className="scrollbar-thin h-[300px] flex-1 overflow-y-auto px-2 py-1"
         >
           {events.map((e, idx) => {
             const meta = LEVEL_META[e.level];
@@ -287,10 +287,10 @@ export function RealtimeFeed({
                   idx === events.length - 1 && 'animate-fade-in bg-brand-50/40',
                 )}
               >
-                <span className="num w-[72px] shrink-0 pt-px text-[11px] text-slate-400">{e.time}</span>
+                <span className="num hidden w-[72px] shrink-0 pt-px text-[11px] text-slate-400 sm:inline">{e.time}</span>
                 <span
                   className={cn(
-                    'mt-px inline-flex w-[68px] shrink-0 items-center gap-1 rounded px-1.5 py-px text-[10px] font-semibold',
+                    'mt-px inline-flex w-[58px] shrink-0 items-center gap-1 rounded px-1.5 py-px text-[10px] font-semibold sm:w-[68px]',
                     meta.cls,
                   )}
                 >

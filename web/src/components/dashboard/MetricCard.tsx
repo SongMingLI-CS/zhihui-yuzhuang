@@ -30,16 +30,16 @@ export function MetricCard({
   return (
     <div
       className={cn(
-        'panel flex items-center gap-4 px-5 py-4 transition-shadow hover:shadow-md',
+        'panel group relative flex min-h-[120px] items-center gap-4 overflow-hidden px-5 py-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-md',
         className,
       )}
     >
-      <span className={cn('grid h-11 w-11 shrink-0 place-items-center rounded-xl', iconClass)}>
+      <span className={cn('grid h-11 w-11 shrink-0 place-items-center rounded-xl ring-1 ring-inset ring-black/[0.025]', iconClass)}>
         {icon}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium text-slate-400">{label}</p>
-        <p className="num mt-1 truncate text-[22px] font-bold leading-none text-slate-800">
+        <p className="text-xs font-semibold text-slate-500">{label}</p>
+        <p className="num mt-1.5 truncate text-[23px] font-bold leading-none tracking-[-0.04em] text-slate-900">
           {value}
         </p>
         <div className="mt-1.5 flex items-center gap-2 text-[11px]">

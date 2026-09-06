@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   Info,
@@ -13,40 +13,38 @@ import {
 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { TrendChart } from '@/components/dashboard/TrendChart';
 import { SalesShareChart } from '@/components/dashboard/SalesShareChart';
 import { RealtimeFeed, type FeedStats } from '@/components/dashboard/RealtimeFeed';
-import { DEMO_NOTE, METRICS, SALES_SHARE, buildTrend } from '@/lib/demo';
+import { METRICS, SALES_SHARE, buildTrend } from '@/lib/demo';
 import { formatDate, formatInt, formatYuan } from '@/lib/format';
 
 export default function DashboardPage() {
+  const [today, setToday] = useState<Date | null>(null);
   const [liveStats, setLiveStats] = useState<FeedStats>({
     total: 0,
     perMin: METRICS.outboxTps,
   });
-  const trend = buildTrend(7);
+  // 趋势数据为静态演示快照，缓存避免实时流水每秒触发整个页面时重建数组、重绘图表
+  const trend = useMemo(() => buildTrend(7), []);
+
+  useEffect(() => setToday(new Date()), []);
 
   const onFeedStats = (stats: FeedStats) => setLiveStats(stats);
 
   return (
-    <div className="flex flex-col gap-5 p-5">
-      {/* 页头 */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div>
-          <h2 className="text-lg font-bold text-slate-800">产业治理大盘</h2>
-          <p className="mt-0.5 text-xs text-slate-400">
-            于庄合作社今日经营快照 · {formatDate(new Date())}
-          </p>
-        </div>
-        <Badge tone="amber" className="ml-auto">
-          <Info size={12} />
-          {DEMO_NOTE}
-        </Badge>
-      </div>
+    <div className="page-stack">
+      <PageHeader
+        eyebrow="OPERATIONS OVERVIEW"
+        title="产业治理大盘"
+        description={`于庄合作社今日经营快照 · ${today ? formatDate(today) : '今日'}`}
+        actions={<Badge tone="amber"><Info size={12} />演示数据</Badge>}
+      />
 
       {/* 指标卡 */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:gap-4 2xl:grid-cols-4">
         <MetricCard
           label="累计助农销售额"
           value={formatYuan(METRICS.cumulativeSales)}
@@ -84,18 +82,18 @@ export default function DashboardPage() {
       </div>
 
       {/* 图表区 */}
-      <div className="grid grid-cols-12 gap-5">
+      <div className="grid grid-cols-12 gap-4 xl:gap-5">
         <Card
-          className="col-span-12 lg:col-span-8"
+          className="col-span-12 xl:col-span-8"
           icon={<TrendingUp size={16} />}
           title="近 7 日订单 / 营收趋势"
           subtitle="订单量（左轴）与 销售额（右轴）· 演示快照"
         >
-          <TrendChart data={trend} height={300} />
+          <TrendChart data={trend} height={290} />
         </Card>
 
         <Card
-          className="col-span-12 lg:col-span-4"
+          className="col-span-12 md:col-span-6 xl:col-span-4"
           icon={<PieChart size={16} />}
           title="销售占比 · 于庄三宝"
           subtitle="按销售额口径 · 演示快照"
@@ -105,7 +103,7 @@ export default function DashboardPage() {
 
         {/* 实时流水（Redis Streams 异步消费） */}
         <Card
-          className="col-span-12"
+          className="col-span-12 md:col-span-6 xl:col-span-12"
           icon={<Radio size={16} />}
           title="Redis Streams · 订单异步消费实时流水"
           subtitle="出库就绪 / 拣货派单 / 削峰写流动态滚动 · 客户端语义模拟"

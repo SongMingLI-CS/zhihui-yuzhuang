@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import ReactECharts from 'echarts-for-react';
+import ReactEChartsCore from 'echarts-for-react/lib/core';
 import type { EChartsOption } from 'echarts';
 import type { SalesShareItem } from '@/lib/demo';
 import { formatYuan } from '@/lib/format';
+import echarts from '@/lib/charts';
 
 /** 图表 B：于庄特色产品销售占比（ECharts 环形图 + 右侧明细） */
 export function SalesShareChart({ data, height = 220 }: { data: SalesShareItem[]; height?: number }) {
@@ -45,10 +46,10 @@ export function SalesShareChart({ data, height = 220 }: { data: SalesShareItem[]
   );
 
   return (
-    <div className="flex items-center gap-4">
-      <div className="relative w-[46%] shrink-0">
+    <div className="flex flex-col items-center gap-2 sm:flex-row sm:gap-4">
+      <div className="relative w-full shrink-0 sm:w-[46%]">
         {mounted ? (
-          <ReactECharts option={option} notMerge lazyUpdate style={{ height }} />
+          <ReactEChartsCore echarts={echarts} option={option} notMerge lazyUpdate style={{ height }} />
         ) : (
           <div style={{ height }} className="animate-pulse rounded-xl bg-slate-100" />
         )}
@@ -57,7 +58,7 @@ export function SalesShareChart({ data, height = 220 }: { data: SalesShareItem[]
           <span className="num text-sm font-bold text-slate-800">{formatYuan(total)}</span>
         </div>
       </div>
-      <ul className="min-w-0 flex-1 space-y-3">
+      <ul className="w-full min-w-0 flex-1 space-y-3">
         {data.map((d) => (
           <li key={d.name}>
             <div className="flex items-center justify-between gap-2 text-xs">

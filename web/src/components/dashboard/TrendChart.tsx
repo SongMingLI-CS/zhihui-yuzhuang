@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import ReactECharts from 'echarts-for-react';
-import { graphic, type EChartsOption } from 'echarts';
+import ReactEChartsCore from 'echarts-for-react/lib/core';
+import type { EChartsOption, LinearGradientObject } from 'echarts';
 import type { TrendPoint } from '@/lib/demo';
+import echarts from '@/lib/charts';
 
 interface TrendChartProps {
   data: TrendPoint[];
@@ -12,12 +13,19 @@ interface TrendChartProps {
 
 const G = { left: 8, right: 8, top: 40, bottom: 4, containLabel: true };
 
-function areaGradient(from: string) {
-  // 使用 echarts.graphic.LinearGradient 构造渐变，避免对象字面量 readonly 类型不满足 AreaStyleOption
-  return new graphic.LinearGradient(0, 0, 0, 1, [
-    { offset: 0, color: from },
-    { offset: 1, color: 'rgba(255,255,255,0)' },
-  ]);
+/** 面积渐变：纯对象字面量（ZRColor 类型），不引入运行时 graphic 依赖 */
+function areaGradient(from: string): LinearGradientObject {
+  return {
+    type: 'linear',
+    x: 0,
+    y: 0,
+    x2: 0,
+    y2: 1,
+    colorStops: [
+      { offset: 0, color: from },
+      { offset: 1, color: 'rgba(255,255,255,0)' },
+    ],
+  };
 }
 
 /** 图表 A：近 7 日订单与营收增长趋势（ECharts 折线面积图） */
@@ -121,5 +129,7 @@ export function TrendChart({ data, height = 280 }: TrendChartProps) {
   if (!mounted) {
     return <div style={{ height }} className="animate-pulse rounded-xl bg-slate-100" />;
   }
-  return <ReactECharts option={option} notMerge lazyUpdate style={{ height }} />;
+  return (
+    <ReactEChartsCore echarts={echarts} option={option} notMerge lazyUpdate style={{ height }} />
+  );
 }
