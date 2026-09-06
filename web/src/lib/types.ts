@@ -88,3 +88,25 @@ export interface MarketingGenerateResponse {
   compliance: ComplianceReport;
   review_status: string;
 }
+
+/* ===================== 认证（POST /api/v1/auth/login） ===================== */
+
+export interface AuthLoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface UserInfo {
+  userId: number;
+  username: string;
+  displayName: string;
+  tenantId: string;
+  role: string;
+}
+
+export interface AuthLoginResponse {
+  token: string;
+  tokenType: string;
+  expiresIn: number;
+  user: UserInfo;
+}

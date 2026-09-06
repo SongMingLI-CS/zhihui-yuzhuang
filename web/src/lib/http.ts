@@ -5,6 +5,8 @@ import type {
   AgriQARequest,
   AgriQAResponse,
   ApiResponse,
+  AuthLoginRequest,
+  AuthLoginResponse,
   MarketingGenerateRequest,
   MarketingGenerateResponse,
 } from './types';
@@ -68,6 +70,13 @@ export function toApiError(err: unknown): ApiError {
     );
   }
   return new ApiError(err instanceof Error ? err.message : '网络异常，请稍后重试');
+}
+
+/* ===================== 认证（POST /api/v1/auth/login） ===================== */
+
+export async function login(payload: AuthLoginRequest): Promise<AuthLoginResponse> {
+  const res = await http.post<ApiResponse<AuthLoginResponse>>(`${API_BASE}/auth/login`, payload);
+  return unwrap(res);
 }
 
 /* ===================== 农技问答（POST /ai/v1/qa/ask，防幻觉溯源） ===================== */

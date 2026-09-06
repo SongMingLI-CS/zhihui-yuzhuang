@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { Providers } from './Providers';
 
 /** 全局壳：左侧深色导航 + 右侧顶栏/内容区 */
 export function AppShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -21,6 +23,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [menuOpen]);
+
+  // 登录页全屏独立，不渲染导航壳
+  if (pathname === '/login') {
+    return <Providers>{children}</Providers>;
+  }
 
   return (
     <Providers>

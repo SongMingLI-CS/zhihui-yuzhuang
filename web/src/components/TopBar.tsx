@@ -1,13 +1,17 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { usePathname } from 'next/navigation';
-import { Building2, Check, ChevronDown, Clock, MapPin, Menu, Wifi } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { Building2, Check, ChevronDown, Clock, LogIn, LogOut, MapPin, Menu, UserRound, Wifi } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { APP_TITLE } from '@/lib/config';
 import { getTenant, setTenant, subscribeTenant, TENANT_OPTIONS, type TenantInfo } from '@/lib/tenant';
 import { useLinkHealth, type LinkHealth } from '@/lib/useLinkHealth';
 import { formatTime } from '@/lib/format';
+import { getStoredUser, persistUser, setCurrentUser, subscribeAuth } from '@/lib/auth';
+import { setAccessToken } from '@/lib/http';
+import type { UserInfo } from '@/lib/types';
 import { NAV_ITEMS } from './navItems';
 
 const LINK_META: Array<{ key: keyof LinkHealth; label: string }> = [
@@ -32,10 +36,18 @@ export function TopBar({ onMenuOpen, menuButtonRef }: { onMenuOpen: () => void; 
   const [tenant, setTenantState] = useState<TenantInfo>(() => getTenant());
   const [pickerOpen, setPickerOpen] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
+  const [user, setUser] = useState<UserInfo | null>(null);
+  const router = useRouter();
   const pickerRef = useRef<HTMLDivElement>(null);
 
   // 订阅租户外部存储变化（axios 拦截器同步读取）
   useEffect(() => subscribeTenant((t) => setTenantState(t)), []);
+
+  // 认证态：初始化并订阅（顶栏用户区 / 登录页共享）
+  useEffect(() => {
+    setUser(getStoredUser());
+    return subscribeAuth((u) => setUser(u));
+  }, []);
 
   // 时钟
   useEffect(() => {
@@ -71,6 +83,13 @@ export function TopBar({ onMenuOpen, menuButtonRef }: { onMenuOpen: () => void; 
   const chooseTenant = (t: TenantInfo) => {
     setTenant(t);
     setPickerOpen(false);
+  };
+
+  const logout = () => {
+    setAccessToken(null);
+    persistUser(null);
+    setCurrentUser(null);
+    router.replace('/login');
   };
 
   return (
@@ -158,6 +177,35 @@ export function TopBar({ onMenuOpen, menuButtonRef }: { onMenuOpen: () => void; 
         <Clock size={14} className="text-gold-400" />
         <span className="num min-w-[62px] text-[13px] tabular-nums text-white">{now ? formatTime(now) : '--:--:--'}</span>
       </div>
+
+      {/* 用户区 */}
+      {user ? (
+        <div className="flex h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2 shadow-sm">
+          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-600">
+            <UserRound size={14} />
+          </span>
+          <span className="hidden max-w-[140px] truncate text-xs font-semibold text-slate-700 xl:block">
+            {user.displayName}
+          </span>
+          <button
+            type="button"
+            onClick={logout}
+            className="flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] font-medium text-slate-500 transition hover:bg-red-50 hover:text-red-600"
+            aria-label="退出登录"
+          >
+            <LogOut size={13} />
+            <span className="hidden lg:inline">退出</span>
+          </button>
+        </div>
+      ) : (
+        <Link
+          href="/login"
+          className="flex h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+        >
+          <LogIn size={14} />
+          <span className="hidden sm:inline">登录</span>
+        </Link>
+      )}
       <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-50 text-brand-700 md:hidden" title="服务链路状态">
         <Wifi size={17} />
       </span>
