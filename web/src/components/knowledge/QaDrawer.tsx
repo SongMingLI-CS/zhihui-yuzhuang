@@ -91,10 +91,12 @@ export function QaDrawer({ open, onClose, initialQuestion }: QaDrawerProps) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const pendingRef = useRef(false);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
 
   // 打开时：重置会话与消息，聚焦输入
   useEffect(() => {
     if (open) {
+      returnFocusRef.current = document.activeElement as HTMLElement;
       sessionRef.current = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
       setMsgs([]);
       setPending(false);
@@ -104,7 +106,19 @@ export function QaDrawer({ open, onClose, initialQuestion }: QaDrawerProps) {
       } else {
         setInput('');
       }
-      window.setTimeout(() => inputRef.current?.focus(), 120);
+      const previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      const timer = window.setTimeout(() => inputRef.current?.focus(), 120);
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key === 'Escape' && !pendingRef.current) onClose();
+      };
+      document.addEventListener('keydown', onKeyDown);
+      return () => {
+        window.clearTimeout(timer);
+        document.body.style.overflow = previousOverflow;
+        document.removeEventListener('keydown', onKeyDown);
+        returnFocusRef.current?.focus();
+      };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -179,7 +193,7 @@ export function QaDrawer({ open, onClose, initialQuestion }: QaDrawerProps) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-40">
+    <div className="fixed inset-0 z-40" role="dialog" aria-modal="true" aria-labelledby="qa-drawer-title">
       {/* 遮罩 */}
       <div className="absolute inset-0 bg-slate-900/35 backdrop-blur-[1px] animate-fade-in" onClick={onClose} />
 
@@ -191,7 +205,7 @@ export function QaDrawer({ open, onClose, initialQuestion }: QaDrawerProps) {
             <Bot size={20} />
           </span>
           <div className="min-w-0 flex-1">
-            <h3 className="flex items-center gap-2 text-[15px] font-semibold text-slate-800">
+            <h3 id="qa-drawer-title" className="flex items-center gap-2 text-[15px] font-semibold text-slate-800">
               农技 RAG 检索验证
               <Badge tone="violet">沙盒</Badge>
             </h3>

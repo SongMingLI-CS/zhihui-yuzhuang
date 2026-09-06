@@ -13,8 +13,10 @@ import {
 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { EmptyBlock } from '@/components/ui/StateView';
 import { QaDrawer } from '@/components/knowledge/QaDrawer';
-import { AGRI_QUICK_QUESTIONS, DEMO_NOTE, KNOWLEDGE_DOCS, type DocStatus } from '@/lib/demo';
+import { AGRI_QUICK_QUESTIONS, KNOWLEDGE_DOCS, type DocStatus } from '@/lib/demo';
 import { formatInt } from '@/lib/format';
 
 const STATUS_META: Record<DocStatus, { label: string; tone: 'green' | 'amber' | 'red' }> = {
@@ -64,20 +66,13 @@ export default function KnowledgePage() {
   };
 
   return (
-    <div className="flex flex-col gap-5 p-5">
-      {/* 页头 */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div>
-          <h2 className="text-lg font-bold text-slate-800">农技知识库沙盒</h2>
-          <p className="mt-0.5 text-xs text-slate-400">
-            已切片文献检索 · 附 Top-K 引用溯源（相似度 / 来源 / 页码）
-          </p>
-        </div>
-        <Badge tone="amber" className="ml-auto hidden md:inline-flex">
-          <Info size={12} />
-          {DEMO_NOTE}
-        </Badge>
-      </div>
+    <div className="page-stack">
+      <PageHeader
+        eyebrow="KNOWLEDGE & RAG"
+        title="农技知识库"
+        description="统一管理农技与惠农政策资料，通过可溯源检索验证每条 AI 回答。"
+        actions={<Badge tone="amber"><Info size={12} />演示数据</Badge>}
+      />
 
       {/* 概览条 */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -123,19 +118,20 @@ export default function KnowledgePage() {
         subtitle="RAG 向量库入库明细（切片语义化拆分 · 租户隔离可见）"
         actions={
           <div className="flex items-center gap-2">
-            <div className="relative hidden md:block">
+            <div className="relative min-w-0 flex-1 sm:flex-none">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-300" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="搜索标题 / 租户 / 来源"
-                className="h-8 w-52 rounded-lg border border-slate-200 bg-white pl-8 pr-2 text-xs text-slate-600 outline-none transition placeholder:text-slate-300 focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                aria-label="搜索知识文献"
+                className="control h-9 w-full pl-8 pr-2 text-xs text-slate-700 placeholder:text-slate-400 sm:w-56"
               />
             </div>
             <button
               type="button"
               onClick={openEmpty}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-brand-700 px-3 text-xs font-medium text-white shadow-sm transition hover:bg-brand-800"
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-brand-700 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-800"
             >
               <Bot size={14} />
               农技检索验证
@@ -144,7 +140,7 @@ export default function KnowledgePage() {
         }
         bodyClassName="p-0"
       >
-        <div className="scrollbar-thin overflow-x-auto">
+        <div className="scrollbar-thin hidden overflow-x-auto md:block">
           <table className="w-full min-w-[860px] text-left text-sm">
             <thead>
               <tr className="border-b border-slate-100 text-[11px] uppercase tracking-wide text-slate-400">
@@ -215,6 +211,32 @@ export default function KnowledgePage() {
               )}
             </tbody>
           </table>
+        </div>
+        <div className="divide-y divide-slate-100 md:hidden">
+          {docs.map((d) => {
+            const st = STATUS_META[d.status];
+            return (
+              <article key={d.id} className="p-4">
+                <div className="flex items-start gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600"><FileText size={17} /></span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="text-sm font-semibold leading-5 text-slate-800">{d.title}</h4>
+                      <Badge tone={st.tone} dot>{st.label}</Badge>
+                    </div>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">{d.tenantName}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400">
+                      <span>{d.chunks} 个切片</span><span>{d.createdAt}</span>
+                    </div>
+                    <button type="button" onClick={() => openVerify(d.id)} className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-brand-200 bg-brand-50 px-3 text-xs font-semibold text-brand-700">
+                      <Bot size={13} />检索验证
+                    </button>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+          {docs.length === 0 && <EmptyBlock>未找到匹配文献，请调整关键词。</EmptyBlock>}
         </div>
       </Card>
 
