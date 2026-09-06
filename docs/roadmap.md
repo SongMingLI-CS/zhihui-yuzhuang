@@ -55,10 +55,10 @@
   - [x] B 端登录页 + 认证态（`/login`，顶栏用户区 + 退出，Bearer Token 持久化）
   - [ ] B 端商品管理页
   - [x] 后端订单列表/详情聚合查询接口（`GET /orders` + `GET /orders/{orderNo}`，含分页/状态/渠道过滤与租户隔离）
-  - [x] B 端前端接入真实订单列表/出库（订单页由 demo 快照切换为 `GET /orders` 分页 + `POST /orders/{orderNo}/ship` 一键出库，双状态徽标展示）
+  - [x] B 端前端接入真实订单列表/履约操作（订单页已服务端分页/搜索 + 双状态徽标；支持 ship / mark-ready / recover 三个行内操作，队列可自循环）
     - [x] 状态域对齐：新增 `FulfillmentStatus`（PENDING/PICKING/READY/SHIPPED/ABNORMAL）独立于交易 `OrderStatus`（PENDING_PAY/STOCK_CONFIRMED/PROCESSING/COMPLETED/CANCELLED），`t_order` 新增 `fulfillment_status` 列，`status`/`fulfillment_status` 双轴解耦
-    - [x] `GET /orders` 支持 `fulfillmentStatus` 过滤；`POST /orders/{orderNo}/ship`（仅 READY→SHIPPED；非就绪/重复出库 409+B2003，不存在/跨租户 404+A1004）
-    - [x] `OrderFulfillmentTest` 出库成功/非就绪409/404/跨租户/重复出库/履约过滤 7 用例通过；`OrderQueryTest` 12 用例通过
+    - [x] `GET /orders` 支持 `fulfillmentStatus`/`keyword`（订单号/收货人模糊）过滤；履约状态机三端点：`ship`(READY→SHIPPED)、`mark-ready`(PICKING→READY)、`recover`(ABNORMAL→PICKING)，状态不符/重复推进 409+B2003，不存在/跨租户 404+A1004
+    - [x] `OrderFulfillmentTest` 12 用例（出库/标记待出库/异常恢复/404/跨租户/重复推进/履约与 keyword 过滤）与 `OrderQueryTest` 12 用例全通过；`web` typecheck + next build 通过
     - [x] `deploy/seed-realistic-data.sql` 交易状态收敛到合法 5 态，并新增 `fulfillment_status` 分布（PENDING→PICKING→READY→SHIPPED + ABNORMAL 样例）
     - [ ] 存量 PG 升级提示：先 `ALTER TABLE t_order ADD COLUMN fulfillment_status VARCHAR(32) NOT NULL DEFAULT 'PENDING';`（已初始化容器需执行后重跑 `make seed`）
 - [x] OpenAPI 文档（Springdoc + `docs/api-spec.yaml`，当前契约覆盖 `/orders/checkout`、`/qa/ask`）

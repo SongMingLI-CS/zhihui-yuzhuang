@@ -160,6 +160,7 @@ export interface OrderListParams {
   pageSize?: number;
   status?: OrderStatus;
   fulfillmentStatus?: FulfillmentStatus;
+  keyword?: string;
   orderSource?: OrderSource;
 }
 

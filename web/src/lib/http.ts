@@ -120,6 +120,18 @@ export async function shipOrder(orderNo: string): Promise<OrderSummary> {
   return unwrap(res);
 }
 
+/** 拣货完成置为待出库：PICKING → READY */
+export async function markOrderReady(orderNo: string): Promise<OrderSummary> {
+  const res = await http.post<ApiResponse<OrderSummary>>(`${API_BASE}/orders/${encodeURIComponent(orderNo)}/mark-ready`);
+  return unwrap(res);
+}
+
+/** 异常单恢复拣货：ABNORMAL → PICKING */
+export async function recoverAbnormalOrder(orderNo: string): Promise<OrderSummary> {
+  const res = await http.post<ApiResponse<OrderSummary>>(`${API_BASE}/orders/${encodeURIComponent(orderNo)}/recover`);
+  return unwrap(res);
+}
+
 /* ===================== 农技问答（POST /ai/v1/qa/ask，防幻觉溯源） ===================== */
 
 export async function askAgri(payload: AgriQARequest): Promise<AgriQAResponse> {
