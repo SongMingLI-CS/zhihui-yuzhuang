@@ -65,6 +65,98 @@ paths:
                   requestId: "req-err-001"
 
   # ==========================================
+  # 订单查询聚合接口 (Spring Boot)
+  # ==========================================
+  /orders:
+    get:
+      summary: 分页查询当前租户订单列表
+      operationId: listOrders
+      parameters:
+        - in: header
+          name: X-Tenant-Id
+          required: false
+          schema:
+            type: string
+            default: "global"
+          description: 多租户标识（缺省 global）
+        - in: query
+          name: page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: 页码（从 1 开始）
+        - in: query
+          name: pageSize
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+          description: 每页条数（1~100）
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [PENDING_PAY, STOCK_CONFIRMED, PROCESSING, CANCELLED, COMPLETED]
+          description: 按订单状态过滤（可选）
+        - in: query
+          name: orderSource
+          required: false
+          schema:
+            type: string
+            enum: [H5_PRIVATE, DOUYIN, KUAISHOU, B2B_PORTAL]
+          description: 按渠道来源过滤（可选）
+      responses:
+        '200':
+          description: 订单分页列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/PageResultOrderSummary'
+        '400':
+          $ref: '#/components/responses/StandardErrorResponse'
+
+  /orders/{orderNo}:
+    get:
+      summary: 查询订单详情（含明细行）
+      operationId: getOrderDetail
+      parameters:
+        - in: header
+          name: X-Tenant-Id
+          required: false
+          schema:
+            type: string
+            default: "global"
+          description: 多租户标识（缺省 global）
+        - in: path
+          name: orderNo
+          required: true
+          schema:
+            type: string
+          description: 业务订单号
+      responses:
+        '200':
+          description: 订单详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/OrderDetailResponse'
+        '404':
+          $ref: '#/components/responses/StandardErrorResponse'
+
+  # ==========================================
   # 农技问答接口 (FastAPI + DeepSeek)
   # ==========================================
   /qa/ask:
@@ -215,6 +307,138 @@ components:
           format: int64
           description: 订单待支付超时毫秒时间戳
           example: 1725438280000
+
+    # 订单分页响应（GET /orders）
+    PageResultOrderSummary:
+      type: object
+      required:
+        - items
+        - page
+        - pageSize
+        - total
+        - totalPages
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderSummaryResponse'
+        page:
+          type: integer
+          example: 1
+        pageSize:
+          type: integer
+          example: 10
+        total:
+          type: integer
+          format: int64
+          example: 50
+        totalPages:
+          type: integer
+          example: 5
+
+    # 订单列表摘要
+    OrderSummaryResponse:
+      type: object
+      required:
+        - orderNo
+        - orderSource
+        - totalAmount
+        - status
+        - createdAt
+      properties:
+        orderNo:
+          type: string
+          example: "ORD202609040001"
+        orderSource:
+          type: string
+          enum: [H5_PRIVATE, DOUYIN, KUAISHOU, B2B_PORTAL]
+          example: "H5_PRIVATE"
+        totalAmount:
+          type: number
+          format: double
+          example: 90.00
+        status:
+          type: string
+          enum: [PENDING_PAY, STOCK_CONFIRMED, PROCESSING, CANCELLED, COMPLETED]
+          example: "STOCK_CONFIRMED"
+        recipientName:
+          type: string
+          example: "张三"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-09-04T19:30:00"
+
+    # 订单明细行
+    OrderItemResponse:
+      type: object
+      required:
+        - skuId
+        - quantity
+        - unitPrice
+        - subtotal
+      properties:
+        skuId:
+          type: integer
+          format: int64
+          example: 100201
+        quantity:
+          type: integer
+          example: 2
+        unitPrice:
+          type: number
+          format: double
+          example: 45.00
+        subtotal:
+          type: number
+          format: double
+          example: 90.00
+
+    # 订单详情
+    OrderDetailResponse:
+      type: object
+      required:
+        - orderNo
+        - orderSource
+        - totalAmount
+        - status
+        - items
+      properties:
+        orderNo:
+          type: string
+          example: "ORD202609040001"
+        orderSource:
+          type: string
+          enum: [H5_PRIVATE, DOUYIN, KUAISHOU, B2B_PORTAL]
+          example: "H5_PRIVATE"
+        totalAmount:
+          type: number
+          format: double
+          example: 90.00
+        status:
+          type: string
+          enum: [PENDING_PAY, STOCK_CONFIRMED, PROCESSING, CANCELLED, COMPLETED]
+          example: "STOCK_CONFIRMED"
+        recipientName:
+          type: string
+          example: "张三"
+        recipientPhone:
+          type: string
+          example: "13800000000"
+        detailedAddress:
+          type: string
+          example: "河南省周口市鹿邑县试量镇于庄村"
+        remark:
+          type: string
+          example: "鹿邑于庄特产，多加泡沫箱包装"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-09-04T19:30:00"
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItemResponse'
 
     # 农技问答请求模型
     AgriQARequest:
