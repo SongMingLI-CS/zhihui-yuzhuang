@@ -15,11 +15,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 订单履约写服务实现（当前支持「一键出库」）。
+ * 订单履约写服务实现。
  *
- * <p>出库语义：仅允许 {@code fulfillment_status = READY} 的订单推进到 {@code SHIPPED}；
- * 采用条件 {@code UPDATE ... WHERE tenant_id=? AND order_no=? AND fulfillment_status='READY'}，
- * 影响行数为 0 说明单已被并发出库或处于非就绪态，统一抛 {@code B2003}，防止并发重复出库。
+ * <p>履约状态机（出库流水轴，独立于交易 {@code status}）：
+ * <pre>
+ *   ship       : READY    -> SHIPPED   （一键出库）
+ *   markReady  : PICKING  -> READY     （拣货完成，进入待出库队列）
+ *   recover    : ABNORMAL -> PICKING   （异常单恢复拣货）
+ * </pre>
+ * 全部采用条件 {@code UPDATE ... WHERE tenant_id=? AND order_no=? AND fulfillment_status=?}，
+ * 影响行数为 0 说明单已被并发展开或处于非期望状态，统一抛 {@code B2003}，防止并发重复推进。
  * 租户隔离：订单不跨租户共享，定位失败一律 {@code A1004}。
  */
 @Slf4j
@@ -35,6 +40,24 @@ public class OrderFulfillmentServiceImpl implements OrderFulfillmentService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public OrderSummaryResponse shipOrder(String tenantId, String orderNo) {
+        return transition(tenantId, orderNo, FulfillmentStatus.READY, FulfillmentStatus.SHIPPED, "出库");
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public OrderSummaryResponse markReady(String tenantId, String orderNo) {
+        return transition(tenantId, orderNo, FulfillmentStatus.PICKING, FulfillmentStatus.READY, "标记待出库");
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public OrderSummaryResponse recoverFromAbnormal(String tenantId, String orderNo) {
+        return transition(tenantId, orderNo, FulfillmentStatus.ABNORMAL, FulfillmentStatus.PICKING, "恢复拣货");
+    }
+
+    /** 通用推进：仅允许 {@code from → to}，条件更新影响行数为 0 时判定并发/状态不符。 */
+    private OrderSummaryResponse transition(String tenantId, String orderNo,
+                                            FulfillmentStatus from, FulfillmentStatus to, String action) {
         String tenant = normalizeTenantId(tenantId);
         String no = (orderNo == null || orderNo.isBlank()) ? null : orderNo.trim();
         if (no == null) {
@@ -49,16 +72,28 @@ public class OrderFulfillmentServiceImpl implements OrderFulfillmentService {
         int rows = orderMapper.update(null, new LambdaUpdateWrapper<Order>()
                 .eq(Order::getTenantId, tenant)
                 .eq(Order::getOrderNo, no)
-                .eq(Order::getFulfillmentStatus, FulfillmentStatus.READY)
-                .set(Order::getFulfillmentStatus, FulfillmentStatus.SHIPPED));
+                .eq(Order::getFulfillmentStatus, from)
+                .set(Order::getFulfillmentStatus, to));
         if (rows == 0) {
-            log.warn("[order] ship conflict orderNo={}, tenantId={}, current={}",
-                    no, tenant, order.getFulfillmentStatus());
-            throw new BusinessException(ResultCode.ORDER_STATE_CONFLICT);
+            log.warn("[order] {} conflict orderNo={}, tenantId={}, current={}",
+                    action, no, tenant, order.getFulfillmentStatus());
+            throw new BusinessException(ResultCode.ORDER_STATE_CONFLICT,
+                    action + "失败：订单当前状态为「" + label(order.getFulfillmentStatus()) + "」，请刷新后重试");
         }
-        order.setFulfillmentStatus(FulfillmentStatus.SHIPPED);
-        log.info("[order] ship success orderNo={}, tenantId={}", no, tenant);
+        order.setFulfillmentStatus(to);
+        log.info("[order] {} success orderNo={}, tenantId={}", action, no, tenant);
         return toSummary(order);
+    }
+
+    /** 履约状态中文标签（仅用于提示文案）。 */
+    private String label(FulfillmentStatus s) {
+        return switch (s) {
+            case PENDING -> "待履约(PENDING)";
+            case PICKING -> "拣货中(PICKING)";
+            case READY -> "待出库(READY)";
+            case SHIPPED -> "已出库(SHIPPED)";
+            case ABNORMAL -> "异常(ABNORMAL)";
+        };
     }
 
     /** 租户规整：null/空白回退 {@code global}。 */
@@ -67,7 +102,7 @@ public class OrderFulfillmentServiceImpl implements OrderFulfillmentService {
                 ? TenantContext.DEFAULT_TENANT_ID : tenantId.trim();
     }
 
-    /** 实体 → 出库后订单摘要。 */
+    /** 实体 → 推进后订单摘要。 */
     private OrderSummaryResponse toSummary(Order order) {
         return OrderSummaryResponse.builder()
                 .orderNo(order.getOrderNo())

@@ -36,6 +36,7 @@ public interface OrderQueryService {
      * @param tenantId          租户标识（null/空白按 {@code global} 兜底）
      * @param status            订单状态过滤（可为 null 表示不过滤）
      * @param fulfillmentStatus 履约状态过滤（可为 null 表示不过滤）
+     * @param keyword           关键词（模糊匹配订单号/收货人；null/空白忽略）
      * @param orderSource       渠道来源过滤（可为 null 表示不过滤）
      * @param page              页码（&lt;=0 时按 1 处理）
      * @param pageSize          每页条数（&lt;=0 按默认 10，上限 100）
@@ -43,7 +44,8 @@ public interface OrderQueryService {
      */
     PageResult<OrderSummaryResponse> listOrders(String tenantId, OrderStatus status,
                                                 FulfillmentStatus fulfillmentStatus,
-                                                OrderSource orderSource, int page, int pageSize);
+                                                String keyword, OrderSource orderSource,
+                                                int page, int pageSize);
 
     /**
      * 查询订单详情（含明细行）。

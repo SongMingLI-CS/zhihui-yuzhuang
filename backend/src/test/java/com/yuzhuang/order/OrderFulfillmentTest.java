@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yuzhuang.common.constant.HeaderNames;
 import com.yuzhuang.common.context.TenantContext;
 import com.yuzhuang.order.entity.Order;
-import com.yuzhuang.order.entity.OrderItem;
+
 import com.yuzhuang.order.enums.FulfillmentStatus;
 import com.yuzhuang.order.enums.OrderSource;
 import com.yuzhuang.order.enums.OrderStatus;
@@ -148,6 +148,71 @@ class OrderFulfillmentTest {
                 .andExpect(jsonPath("$.code").value("A1001"));
     }
 
+    @Test
+    void markReady_pickingOrder_returns200AndPersistsReady() throws Exception {
+        seedOrder(TENANT_A, "ORD-MR-1", "PROCESSING", "PICKING", "DOUYIN");
+
+        mockMvc.perform(post("/api/v1/orders/ORD-MR-1/mark-ready")
+                        .header(HeaderNames.X_TENANT_ID, TENANT_A))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("00000"))
+                .andExpect(jsonPath("$.data.fulfillmentStatus").value("READY"));
+
+        Order persisted = orderMapper.selectOne(new LambdaQueryWrapper<Order>()
+                .eq(Order::getTenantId, TENANT_A)
+                .eq(Order::getOrderNo, "ORD-MR-1"));
+        assertThat(persisted.getFulfillmentStatus()).isEqualTo(FulfillmentStatus.READY);
+    }
+
+    @Test
+    void markReady_notPickingOrder_returns409B2003() throws Exception {
+        seedOrder(TENANT_A, "ORD-MR-2", "STOCK_CONFIRMED", "READY", "H5_PRIVATE");
+
+        mockMvc.perform(post("/api/v1/orders/ORD-MR-2/mark-ready")
+                        .header(HeaderNames.X_TENANT_ID, TENANT_A))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("B2003"));
+    }
+
+    @Test
+    void recover_abnormalOrder_returns200AndPersistsPicking() throws Exception {
+        seedOrder(TENANT_A, "ORD-RC-1", "PROCESSING", "ABNORMAL", "KUAISHOU");
+
+        mockMvc.perform(post("/api/v1/orders/ORD-RC-1/recover")
+                        .header(HeaderNames.X_TENANT_ID, TENANT_A))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("00000"))
+                .andExpect(jsonPath("$.data.fulfillmentStatus").value("PICKING"));
+
+        Order persisted = orderMapper.selectOne(new LambdaQueryWrapper<Order>()
+                .eq(Order::getTenantId, TENANT_A)
+                .eq(Order::getOrderNo, "ORD-RC-1"));
+        assertThat(persisted.getFulfillmentStatus()).isEqualTo(FulfillmentStatus.PICKING);
+    }
+
+    @Test
+    void recover_normalOrder_returns409B2003() throws Exception {
+        seedOrder(TENANT_A, "ORD-RC-2", "PROCESSING", "PICKING", "DOUYIN");
+
+        mockMvc.perform(post("/api/v1/orders/ORD-RC-2/recover")
+                        .header(HeaderNames.X_TENANT_ID, TENANT_A))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("B2003"));
+    }
+
+    @Test
+    void list_keywordMatchesOrderNoAndRecipient() throws Exception {
+        seedOrder(TENANT_A, "ORD-KW-1", "STOCK_CONFIRMED", "READY", "H5_PRIVATE");
+        seedOrder(TENANT_A, "ORD-KW-2", "PROCESSING", "SHIPPED", "DOUYIN");
+
+        mockMvc.perform(get("/api/v1/orders")
+                        .header(HeaderNames.X_TENANT_ID, TENANT_A)
+                        .param("keyword", "ORD-KW-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.items[0].orderNo").value("ORD-KW-1"));
+    }
+
     private Order seedOrder(String tenantId, String orderNo, String status, String fulfillmentStatus,
                             String source) {
         Order order = Order.builder()
@@ -168,15 +233,5 @@ class OrderFulfillmentTest {
         return order;
     }
 
-    private void seedItem(String orderNo, Long skuId, int quantity, String unitPrice) {
-        BigDecimal price = new BigDecimal(unitPrice);
-        OrderItem item = OrderItem.builder()
-                .orderNo(orderNo)
-                .skuId(skuId)
-                .quantity(quantity)
-                .unitPrice(price)
-                .subtotal(price.multiply(BigDecimal.valueOf(quantity)))
-                .build();
-        orderItemMapper.insert(item);
-    }
+
 }

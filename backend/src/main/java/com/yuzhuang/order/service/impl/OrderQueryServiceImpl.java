@@ -49,13 +49,14 @@ public class OrderQueryServiceImpl implements OrderQueryService {
     @Override
     public PageResult<OrderSummaryResponse> listOrders(String tenantId, OrderStatus status,
                                                        OrderSource orderSource, int page, int pageSize) {
-        return listOrders(tenantId, status, null, orderSource, page, pageSize);
+        return listOrders(tenantId, status, null, null, orderSource, page, pageSize);
     }
 
     @Override
     public PageResult<OrderSummaryResponse> listOrders(String tenantId, OrderStatus status,
                                                        FulfillmentStatus fulfillmentStatus,
-                                                       OrderSource orderSource, int page, int pageSize) {
+                                                       String keyword, OrderSource orderSource,
+                                                       int page, int pageSize) {
         String tenant = normalizeTenantId(tenantId);
         int p = page <= 0 ? DEFAULT_PAGE : page;
         int size = pageSize <= 0 ? DEFAULT_PAGE_SIZE : Math.min(pageSize, MAX_PAGE_SIZE);
@@ -67,6 +68,10 @@ public class OrderQueryServiceImpl implements OrderQueryService {
         }
         if (fulfillmentStatus != null) {
             wrapper.eq(Order::getFulfillmentStatus, fulfillmentStatus);
+        }
+        if (keyword != null && !keyword.isBlank()) {
+            String kw = keyword.trim();
+            wrapper.and(w -> w.like(Order::getOrderNo, kw).or().like(Order::getRecipientName, kw));
         }
         if (orderSource != null) {
             wrapper.eq(Order::getOrderSource, orderSource);

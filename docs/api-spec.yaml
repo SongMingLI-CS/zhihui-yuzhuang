@@ -251,6 +251,13 @@ paths:
             type: string
             enum: [PENDING, PICKING, READY, SHIPPED, ABNORMAL]
           description: 按履约状态过滤（可选，B 端履约看板使用）
+        - in: query
+          name: keyword
+          required: false
+          schema:
+            type: string
+            maxLength: 64
+          description: 关键词（模糊匹配订单号/收货人，可选）
       responses:
         '200':
           description: 订单分页列表
@@ -340,6 +347,94 @@ paths:
                   data: null
                   timestamp: 1725437380000
                   requestId: "req-err-002"
+
+  /orders/{orderNo}/mark-ready:
+    post:
+      summary: 拣货完成置为待出库（履约状态 PICKING → READY）
+      operationId: markOrderReady
+      parameters:
+        - in: header
+          name: X-Tenant-Id
+          required: false
+          schema:
+            type: string
+            default: "global"
+          description: 多租户标识（缺省 global）
+        - in: path
+          name: orderNo
+          required: true
+          schema:
+            type: string
+          description: 业务订单号
+      responses:
+        '200':
+          description: 标记成功，返回更新后的订单摘要（fulfillmentStatus=READY）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/OrderSummaryResponse'
+        '404':
+          $ref: '#/components/responses/StandardErrorResponse'
+        '409':
+          description: 订单当前不是拣货中（PICKING）状态，无法置为待出库
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+                example:
+                  code: "B2003"
+                  message: "标记待出库失败：订单当前状态非拣货中，请刷新后重试"
+                  data: null
+                  timestamp: 1725437380000
+                  requestId: "req-err-003"
+
+  /orders/{orderNo}/recover:
+    post:
+      summary: 异常单恢复拣货（履约状态 ABNORMAL → PICKING）
+      operationId: recoverAbnormalOrder
+      parameters:
+        - in: header
+          name: X-Tenant-Id
+          required: false
+          schema:
+            type: string
+            default: "global"
+          description: 多租户标识（缺省 global）
+        - in: path
+          name: orderNo
+          required: true
+          schema:
+            type: string
+          description: 业务订单号
+      responses:
+        '200':
+          description: 恢复成功，返回更新后的订单摘要（fulfillmentStatus=PICKING）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/OrderSummaryResponse'
+        '404':
+          $ref: '#/components/responses/StandardErrorResponse'
+        '409':
+          description: 订单当前不是异常（ABNORMAL）状态，无法恢复
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+                example:
+                  code: "B2003"
+                  message: "恢复拣货失败：订单当前状态非异常，请刷新后重试"
+                  data: null
+                  timestamp: 1725437380000
+                  requestId: "req-err-004"
 
   # ==========================================
   # 农技问答接口 (FastAPI + DeepSeek)

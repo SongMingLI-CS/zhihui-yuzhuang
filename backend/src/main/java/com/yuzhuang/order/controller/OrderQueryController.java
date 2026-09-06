@@ -51,13 +51,14 @@ public class OrderQueryController {
             String tenantId,
             @RequestParam(value = "status", required = false) OrderStatus status,
             @RequestParam(value = "fulfillmentStatus", required = false) FulfillmentStatus fulfillmentStatus,
+            @RequestParam(value = "keyword", required = false) String keyword,
             @RequestParam(value = "orderSource", required = false) OrderSource orderSource,
             @RequestParam(value = "page", defaultValue = "1") int page,
             @RequestParam(value = "pageSize", defaultValue = "10") int pageSize) {
-        log.debug("[order-query] list tenantId={}, status={}, fulfillmentStatus={}, orderSource={}, page={}, pageSize={}",
-                tenantId, status, fulfillmentStatus, orderSource, page, pageSize);
+        log.debug("[order-query] list tenantId={}, status={}, fulfillmentStatus={}, keyword={}, orderSource={}, page={}, pageSize={}",
+                tenantId, status, fulfillmentStatus, keyword, orderSource, page, pageSize);
         return ApiResponse.success(orderQueryService.listOrders(
-                tenantId, status, fulfillmentStatus, orderSource, page, pageSize));
+                tenantId, status, fulfillmentStatus, keyword, orderSource, page, pageSize));
     }
 
     @Operation(summary = "查询订单详情（含明细行）")
