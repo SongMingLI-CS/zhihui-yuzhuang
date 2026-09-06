@@ -27,7 +27,7 @@ export function Sidebar({ mobile = false, onNavigate }: { mobile?: boolean; onNa
 
       {/* 导航 */}
       <nav className="flex-1 space-y-1 px-3" aria-label="运营指挥">
-        <p className="px-2 pb-1 text-[10px] font-medium uppercase tracking-wider text-brand-400">
+        <p className="px-2 pb-1 text-[10px] font-medium uppercase tracking-wider text-brand-200">
           运营指挥
         </p>
         {NAV_ITEMS.map((item) => {
@@ -57,7 +57,7 @@ export function Sidebar({ mobile = false, onNavigate }: { mobile?: boolean; onNa
       {/* 底部说明 */}
       <div className="border-t border-white/10 px-5 py-4 text-[11px] leading-relaxed text-brand-300">
         <p className="font-medium text-brand-100">于庄数字助农示范平台</p>
-        <p className="mt-1 flex items-center gap-1 text-brand-400">演示环境 · 数据仅作项目展示 <ArrowUpRight size={11} /></p>
+        <p className="mt-1 flex items-center gap-1 text-brand-200">演示环境 · 数据仅作项目展示 <ArrowUpRight size={11} /></p>
       </div>
     </aside>
   );

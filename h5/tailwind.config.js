@@ -3,6 +3,12 @@ export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      colors: {
+        slate: {
+          300: '#64748b',
+          400: '#5b677a',
+        },
+      },
       fontFamily: {
         sans: [
           '-apple-system',

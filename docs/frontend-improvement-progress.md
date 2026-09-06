@@ -125,3 +125,45 @@
 - 当前 B 端指标、知识文献和订单仍以演示快照为主；后端聚合接口就绪后，可将统一 Skeleton/Error 状态接入真实请求。
 - 当前没有认证、设置、删除或分页业务能力，因此未虚构对应页面；待业务接口明确后再沿现有设计系统扩展。
 - 后续可增加 Playwright 视觉回归与 axe 自动化无障碍测试，锁定 390/768/1440 三组基准。
+
+## 真实链路、自动化防御与 H5 离线能力（2026-09-06）
+
+### 本轮完成内容
+
+- Web/H5 接入 TanStack Query，统一查询重试、缓存、Mutation 与错误生命周期；H5 商品和下单已迁移，下单成功自动刷新库存。
+- 请求拦截器统一携带租户标识，并预留 Bearer Token；新增统一分页响应类型与 SSE 流解析器。当前后端无流式端点，默认安全回退已存在的 JSON 问答接口。
+- B/H5 问答支持逐 token 渲染、引用后到达更新和自动滚动。
+- 新增危险操作确认弹窗，具备倒计时、busy、Esc、焦点归还与 `alertdialog` 语义，并接入 Dashboard 清屏操作。
+- 新增 `usePagination` 与通用分页器，订单页页码、页大小同步 URL。
+- H5 引入 PWA：预缓存 AppShell，商品接口 NetworkFirst，离线状态提示；结算、成功弹窗与问答按需加载，拆分 React/Data vendor。
+- 新增 Playwright 两条核心回归和 axe 严重/致命规则扫描；CI 同时运行两端 lint、typecheck、test、build 和桌面/移动浏览器测试。
+
+### 修改的文件
+
+- Web/H5 Providers、请求层、配置、问答与下单组件。
+- H5 Vite/PWA 配置、离线提示与应用入口。
+- Web 危险确认、分页 Hook/组件及订单、Dashboard 页面。
+- Playwright 配置、E2E 用例、GitHub Actions 与接口接驳文档。
+
+### 截图或视觉检查结果
+
+- Playwright 在桌面 Chrome 与 Pixel 5（约 393px）运行真实 DOM 流程；桌面表格与移动卡片的可见控件分别可操作。
+- H5 下单抽屉在桌面和手机视口均完成字段校验、填充和成功弹窗。
+- axe 对 Dashboard、Knowledge、Agents、Orders、RAG dialog、危险操作 alertdialog 和 H5 扫描；修复弱辅助文字对比度后，完整规则未发现 serious/critical 级问题。
+
+### 测试结果
+
+- web：lint、typecheck、Vitest、production build 通过。
+- h5：lint、typecheck、Vitest、production build 通过；PWA 预缓存 16 项，约 319 KiB。
+- Playwright：桌面、768px 平板与移动共 9 条用例全部通过；断言所有主要路由无横向溢出。移动端首次发现测试选择器只匹配桌面表格，已改为驱动可见控件。
+
+### 发现的问题
+
+- 后端仍无认证、B 端列表/分页、Dashboard 聚合和 SSE/WebSocket 接口，相关能力只能按明确契约预留。
+- npm audit 报告来自当前依赖树的已知漏洞，需要在不破坏 Next/Vite 版本兼容的独立升级轮次处理。
+
+### 下一轮计划
+
+- 后端补齐接口后，将 B 端演示快照替换为真实 Query，并接入分页参数。
+- 为 SSE 端点增加后端实现及断线重连、Last-Event-ID 与服务端取消传播。
+- 增加 768px 专项视觉快照与颜色对比基准。

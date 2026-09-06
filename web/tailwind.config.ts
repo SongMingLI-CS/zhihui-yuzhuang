@@ -9,6 +9,10 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        slate: {
+          300: '#64748b',
+          400: '#5b677a',
+        },
         brand: {
           50: '#f0f9f2',
           100: '#dcf0e1',

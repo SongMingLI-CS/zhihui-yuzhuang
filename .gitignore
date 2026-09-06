@@ -31,6 +31,8 @@ dist/
 build/
 *.tsbuildinfo
 next-env.d.ts
+playwright-report/
+test-results/
 
 # ===== Flutter (mobile) =====
 mobile/.dart_tool/
