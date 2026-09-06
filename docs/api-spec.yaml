@@ -11,6 +11,43 @@ servers:
 
 paths:
   # ==========================================
+  # 认证接口 (Spring Boot · JWT)
+  # ==========================================
+  /auth/login:
+    post:
+      summary: 用户登录（用户名/密码换取 JWT）
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthLoginRequest'
+      responses:
+        '200':
+          description: 登录成功，返回访问令牌与用户信息
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/AuthLoginResponse'
+        '401':
+          description: 用户名或密码错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+                example:
+                  code: "A1002"
+                  message: "用户名或密码错误"
+                  data: null
+                  timestamp: 1725437380000
+                  requestId: "req-err-001"
+
+  # ==========================================
   # 特产下单接口 (Spring Boot)
   # ==========================================
   /orders/checkout:
@@ -192,7 +229,74 @@ paths:
           $ref: '#/components/responses/StandardErrorResponse'
 
 components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
+    # 登录请求模型
+    AuthLoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          minLength: 2
+          maxLength: 64
+          example: "admin"
+        password:
+          type: string
+          minLength: 6
+          maxLength: 128
+          example: "admin123"
+
+    # 登录响应模型
+    AuthLoginResponse:
+      type: object
+      required:
+        - token
+        - tokenType
+        - expiresIn
+        - user
+      properties:
+        token:
+          type: string
+          description: JWT 访问令牌（Authorization: Bearer <token>）
+          example: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiJ9.signature"
+        tokenType:
+          type: string
+          enum: [Bearer]
+          example: "Bearer"
+        expiresIn:
+          type: integer
+          format: int64
+          description: 令牌有效期（秒）
+          example: 7200
+        user:
+          type: object
+          properties:
+            userId:
+              type: integer
+              format: int64
+              example: 1
+            username:
+              type: string
+              example: "admin"
+            displayName:
+              type: string
+              example: "于庄村委管理员"
+            tenantId:
+              type: string
+              example: "tenant_yuzhuang_001"
+            role:
+              type: string
+              enum: [FARMER, COOPERATIVE, VILLAGE]
+              example: "VILLAGE"
+
     # 基础统一响应包
     ApiResponse:
       type: object
