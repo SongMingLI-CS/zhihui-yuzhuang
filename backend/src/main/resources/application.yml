@@ -61,6 +61,9 @@ springdoc:
 # enabled=false 时禁用后台 Sweeper/消费者/Stream 监听（测试环境隔离）。
 # ============================================================
 yuzhuang:
+  auth:
+    secret: ${AUTH_JWT_SECRET:yuzhuang-demo-jwt-secret-0123456789abcdef}
+    expire-minutes: ${AUTH_JWT_EXPIRE_MINUTES:120}
   outbox:
     enabled: ${OUTBOX_ENABLED:true}
     scan-interval-ms: ${OUTBOX_SCAN_INTERVAL_MS:2000}
