@@ -205,7 +205,7 @@ WITH base AS (
                 4,4,4,4,4,4,
                 5,5,5,5,5,5,5,5,5,
                 6,6,6,6,6,6,6,6
-            ])[n] IN (5, 6) THEN 'SHIPPED'
+            ])[n] IN (5, 6) THEN CASE WHEN n % 7 = 0 THEN 'PENDING' ELSE 'SHIPPED' END
             WHEN (ARRAY [
                 0,0,0,
                 1,1,1,1,1,1,1,1,
@@ -223,7 +223,7 @@ WITH base AS (
                 4,4,4,4,4,4,
                 5,5,5,5,5,5,5,5,5,
                 6,6,6,6,6,6,6,6
-            ])[n] = 3 THEN CASE WHEN n % 5 = 0 THEN 'PICKING' ELSE 'READY' END
+            ])[n] = 3 THEN CASE WHEN n % 5 = 0 THEN 'SHIPPED' WHEN n % 3 = 0 THEN 'READY' ELSE 'PICKING' END
             WHEN (ARRAY [
                 0,0,0,
                 1,1,1,1,1,1,1,1,
