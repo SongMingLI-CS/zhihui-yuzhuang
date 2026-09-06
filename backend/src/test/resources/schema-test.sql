@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS t_order (
     order_source      VARCHAR(32)   NOT NULL,
     total_amount      NUMERIC(12, 2) NOT NULL DEFAULT 0,
     status            VARCHAR(32)   NOT NULL,
+    fulfillment_status VARCHAR(32)  NOT NULL DEFAULT 'PENDING',
     recipient_name    VARCHAR(64)   NOT NULL,
     recipient_phone   VARCHAR(20)   NOT NULL,
     detailed_address  VARCHAR(512)  NOT NULL,

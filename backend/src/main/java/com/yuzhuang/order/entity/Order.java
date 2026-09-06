@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.yuzhuang.order.enums.OrderSource;
 import com.yuzhuang.order.enums.OrderStatus;
+import com.yuzhuang.order.enums.FulfillmentStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -49,6 +50,9 @@ public class Order {
 
     /** 订单状态 */
     private OrderStatus status;
+
+    /** 履约状态（出库流水维度） */
+    private FulfillmentStatus fulfillmentStatus;
 
     /** 收货人姓名 */
     private String recipientName;

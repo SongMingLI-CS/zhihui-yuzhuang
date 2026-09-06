@@ -244,6 +244,13 @@ paths:
             type: string
             enum: [H5_PRIVATE, DOUYIN, KUAISHOU, B2B_PORTAL]
           description: 按渠道来源过滤（可选）
+        - in: query
+          name: fulfillmentStatus
+          required: false
+          schema:
+            type: string
+            enum: [PENDING, PICKING, READY, SHIPPED, ABNORMAL]
+          description: 按履约状态过滤（可选，B 端履约看板使用）
       responses:
         '200':
           description: 订单分页列表
@@ -289,6 +296,50 @@ paths:
                         $ref: '#/components/schemas/OrderDetailResponse'
         '404':
           $ref: '#/components/responses/StandardErrorResponse'
+
+  /orders/{orderNo}/ship:
+    post:
+      summary: 订单一键出库（履约状态 READY → SHIPPED）
+      operationId: shipOrder
+      parameters:
+        - in: header
+          name: X-Tenant-Id
+          required: false
+          schema:
+            type: string
+            default: "global"
+          description: 多租户标识（缺省 global）
+        - in: path
+          name: orderNo
+          required: true
+          schema:
+            type: string
+          description: 业务订单号
+      responses:
+        '200':
+          description: 出库成功，返回更新后的订单摘要（fulfillmentStatus=SHIPPED）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/OrderSummaryResponse'
+        '404':
+          $ref: '#/components/responses/StandardErrorResponse'
+        '409':
+          description: 订单非出库就绪（READY）状态或已出库，无法推进
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+                example:
+                  code: "B2003"
+                  message: "订单状态已更新，请刷新后重试"
+                  data: null
+                  timestamp: 1725437380000
+                  requestId: "req-err-002"
 
   # ==========================================
   # 农技问答接口 (FastAPI + DeepSeek)
@@ -638,6 +689,10 @@ components:
           type: string
           enum: [PENDING_PAY, STOCK_CONFIRMED, PROCESSING, CANCELLED, COMPLETED]
           example: "STOCK_CONFIRMED"
+        fulfillmentStatus:
+          type: string
+          enum: [PENDING, PICKING, READY, SHIPPED, ABNORMAL]
+          example: "READY"
         recipientName:
           type: string
           example: "张三"
@@ -696,6 +751,10 @@ components:
           type: string
           enum: [PENDING_PAY, STOCK_CONFIRMED, PROCESSING, CANCELLED, COMPLETED]
           example: "STOCK_CONFIRMED"
+        fulfillmentStatus:
+          type: string
+          enum: [PENDING, PICKING, READY, SHIPPED, ABNORMAL]
+          example: "READY"
         recipientName:
           type: string
           example: "张三"

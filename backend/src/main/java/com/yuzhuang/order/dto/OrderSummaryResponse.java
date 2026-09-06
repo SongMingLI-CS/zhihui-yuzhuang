@@ -32,6 +32,9 @@ public class OrderSummaryResponse {
     /** 订单状态 */
     private String status;
 
+    /** 履约状态（出库流水维度） */
+    private String fulfillmentStatus;
+
     /** 收货人姓名 */
     private String recipientName;
 

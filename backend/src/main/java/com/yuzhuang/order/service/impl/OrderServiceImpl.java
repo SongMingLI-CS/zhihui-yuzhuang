@@ -13,6 +13,7 @@ import com.yuzhuang.order.dto.OrderCheckoutResponse;
 import com.yuzhuang.order.dto.OrderItemRequest;
 import com.yuzhuang.order.entity.Order;
 import com.yuzhuang.order.entity.OrderItem;
+import com.yuzhuang.order.enums.FulfillmentStatus;
 import com.yuzhuang.order.enums.OrderSource;
 import com.yuzhuang.order.enums.OrderStatus;
 import com.yuzhuang.order.mapper.OrderItemMapper;
@@ -137,6 +138,7 @@ public class OrderServiceImpl implements OrderService {
                 .orderSource(request.getOrderSource())
                 .totalAmount(totalAmount)
                 .status(OrderStatus.STOCK_CONFIRMED)
+                .fulfillmentStatus(FulfillmentStatus.PENDING)
                 .recipientName(request.getReceiverAddress().getRecipientName())
                 .recipientPhone(request.getReceiverAddress().getPhone())
                 .detailedAddress(request.getReceiverAddress().getDetailedAddress())

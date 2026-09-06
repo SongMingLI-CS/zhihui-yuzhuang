@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS t_order (
     order_source      VARCHAR(32)   NOT NULL,
     total_amount      NUMERIC(12, 2) NOT NULL DEFAULT 0,
     status            VARCHAR(32)   NOT NULL,
+    fulfillment_status VARCHAR(32)  NOT NULL DEFAULT 'PENDING',
     recipient_name    VARCHAR(64)   NOT NULL,
     recipient_phone   VARCHAR(20)   NOT NULL,
     detailed_address  VARCHAR(512)  NOT NULL,
@@ -55,6 +56,7 @@ COMMENT ON TABLE  t_order                      IS '特产主订单';
 COMMENT ON COLUMN t_order.order_source         IS '订单渠道来源：H5_PRIVATE/DOUYIN/KUAISHOU/B2B_PORTAL';
 COMMENT ON COLUMN t_order.idempotency_key      IS '渠道/前端幂等键（与 tenant_id 联合唯一）';
 COMMENT ON COLUMN t_order.status               IS '订单状态：PENDING_PAY/STOCK_CONFIRMED/PROCESSING 等';
+COMMENT ON COLUMN t_order.fulfillment_status   IS '履约状态：PENDING/PICKING/READY/SHIPPED/ABNORMAL';
 
 -- 订单明细（下单商品行快照）
 CREATE TABLE IF NOT EXISTS t_order_item (
