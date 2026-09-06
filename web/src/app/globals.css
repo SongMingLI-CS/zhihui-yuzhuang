@@ -2,40 +2,104 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  color-scheme: light;
+  --canvas: #f3f5f1;
+  --canvas-deep: #e9eee8;
+  --surface: #ffffff;
+  --surface-soft: #f8faf7;
+  --ink: #17211b;
+  --ink-muted: #5f6e65;
+  --ink-subtle: #8b978f;
+  --line: #dfe6df;
+  --line-strong: #ccd7ce;
+  --brand: #235d3f;
+  --brand-strong: #194832;
+  --brand-soft: #e7f2ea;
+  --gold: #c89a3d;
+  --success: #258258;
+  --warning: #b7791f;
+  --danger: #c54b45;
+  --info: #397ca8;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --shadow-card: 0 1px 2px rgba(20, 42, 29, 0.04), 0 12px 30px rgba(20, 42, 29, 0.055);
+  --shadow-float: 0 18px 54px rgba(16, 35, 24, 0.16);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 html,
 body {
   height: 100%;
 }
 
 body {
-  @apply bg-[#eef1ec] font-sans text-slate-800 antialiased;
+  margin: 0;
+  background:
+    radial-gradient(circle at 78% -10%, rgba(200, 154, 61, 0.07), transparent 30rem),
+    var(--canvas);
+  color: var(--ink);
+  @apply font-sans antialiased;
 }
 
-/* 细滚动条：数据表格 / 实时流水通用 */
+::selection { background: rgba(59, 143, 92, 0.2); }
+
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 3px solid rgba(59, 143, 92, 0.24);
+  outline-offset: 2px;
+}
+
+button,
+a { -webkit-tap-highlight-color: transparent; }
+button:disabled { cursor: not-allowed; }
+
 .scrollbar-thin {
   scrollbar-width: thin;
   scrollbar-color: rgba(100, 116, 139, 0.35) transparent;
 }
-.scrollbar-thin::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background-color: rgba(100, 116, 139, 0.35);
-  border-radius: 9999px;
-}
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: transparent;
-}
+.scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background-color: rgba(100, 116, 139, 0.35); border-radius: 9999px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
 
-/* 大屏数字等宽字体增强可读性 */
 .num {
   font-family: theme('fontFamily.digit');
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
 }
 
-/* 通用面板卡片 */
 .panel {
-  @apply rounded-2xl border border-slate-200/80 bg-white shadow-sm;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.page-stack { display: flex; flex-direction: column; gap: 20px; }
+.page-container { width: 100%; max-width: 1480px; margin-inline: auto; }
+
+.control {
+  min-height: 40px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+.control:hover { border-color: #aebeb2; }
+.control:focus { border-color: #579873; box-shadow: 0 0 0 3px rgba(59, 143, 92, 0.13); outline: none; }
+
+@media (max-width: 1023px) {
+  .page-stack { gap: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

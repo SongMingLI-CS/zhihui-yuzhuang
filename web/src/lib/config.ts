@@ -12,7 +12,7 @@ export const AI_BASE = process.env.NEXT_PUBLIC_AI_BASE ?? '/ai/v1';
 export const GATEWAY_BASE = process.env.NEXT_PUBLIC_GATEWAY_BASE ?? '';
 
 export const APP_TITLE = '智汇于庄 · 数字产业中台与治理大脑';
-export const APP_SHORT = '数字于庄';
+export const APP_SHORT = '智汇于庄';
 
 /** Redis Streams 常量（与 backend RedisStreamConstants.java 对齐，用于大屏流水语义） */
 export const STREAM_ORDER_EVENTS = 'stream:order:events';

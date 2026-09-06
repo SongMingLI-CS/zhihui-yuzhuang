@@ -28,18 +28,18 @@ export function Card({
   return (
     <section className={cn('panel flex flex-col overflow-hidden', className)}>
       {hasHeader && (
-        <header className="flex items-center gap-2 border-b border-slate-100 px-5 py-3.5">
-          {icon != null && <span className="text-brand-600">{icon}</span>}
+        <header className="flex flex-wrap items-start gap-2.5 border-b border-slate-100 px-4 py-4 sm:flex-nowrap sm:items-center sm:px-5">
+          {icon != null && <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-700 sm:mt-0">{icon}</span>}
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-[15px] font-semibold text-slate-800">{title}</h3>
+            <h3 className="text-[15px] font-semibold leading-5 text-slate-900">{title}</h3>
             {subtitle != null && (
-              <p className="mt-0.5 truncate text-xs text-slate-400">{subtitle}</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">{subtitle}</p>
             )}
           </div>
-          {actions != null && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+          {actions != null && <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto">{actions}</div>}
         </header>
       )}
-      <div className={cn('min-h-0 flex-1', padded && 'p-5', bodyClassName)}>{children}</div>
+      <div className={cn('min-h-0 flex-1', padded && 'p-4 sm:p-5', bodyClassName)}>{children}</div>
     </section>
   );
 }

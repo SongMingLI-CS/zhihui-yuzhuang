@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { usePathname } from 'next/navigation';
-import { Building2, Check, ChevronDown, Clock, MapPin } from 'lucide-react';
+import { Building2, Check, ChevronDown, Clock, MapPin, Menu, Wifi } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { APP_TITLE } from '@/lib/config';
 import { getTenant, setTenant, subscribeTenant, TENANT_OPTIONS, type TenantInfo } from '@/lib/tenant';
@@ -26,12 +26,12 @@ function Dot({ state }: { state: string }) {
   return <span className={cn('h-1.5 w-1.5 rounded-full', cls)} />;
 }
 
-export function TopBar() {
+export function TopBar({ onMenuOpen, menuButtonRef }: { onMenuOpen: () => void; menuButtonRef: RefObject<HTMLButtonElement> }) {
   const pathname = usePathname();
   const health = useLinkHealth();
   const [tenant, setTenantState] = useState<TenantInfo>(() => getTenant());
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [now, setNow] = useState<Date>(() => new Date());
+  const [now, setNow] = useState<Date | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
 
   // 订阅租户外部存储变化（axios 拦截器同步读取）
@@ -39,6 +39,7 @@ export function TopBar() {
 
   // 时钟
   useEffect(() => {
+    setNow(new Date());
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
   }, []);
@@ -51,8 +52,15 @@ export function TopBar() {
         setPickerOpen(false);
       }
     };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPickerOpen(false);
+    };
     document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onClick);
+      document.removeEventListener('keydown', onKeyDown);
+    };
   }, [pickerOpen]);
 
   const active = useMemo(() => {
@@ -66,11 +74,23 @@ export function TopBar() {
   };
 
   return (
-    <header className="z-20 flex h-[60px] shrink-0 items-center gap-4 border-b border-slate-200/80 bg-white/90 px-6 backdrop-blur">
+    <header className="z-20 flex h-16 shrink-0 items-center gap-2 border-b border-slate-200/70 bg-white/88 px-3 backdrop-blur-xl sm:gap-3 sm:px-4 lg:px-6">
+      <button
+        ref={menuButtonRef}
+        type="button"
+        onClick={onMenuOpen}
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700 lg:hidden"
+        aria-label="打开主导航"
+      >
+        <Menu size={19} />
+      </button>
       {/* 左侧标题区 */}
       <div className="min-w-0 flex-1">
-        <h1 className="truncate text-[15px] font-bold text-slate-800">{APP_TITLE}</h1>
-        <p className="truncate text-[11px] text-slate-400">{active.description}</p>
+        <h1 className="truncate text-sm font-bold tracking-[-0.01em] text-slate-900 sm:text-[15px]">
+          <span className="hidden sm:inline">{APP_TITLE}</span>
+          <span className="sm:hidden">{active.short}</span>
+        </h1>
+        <p className="hidden truncate text-[11px] text-slate-400 sm:block">{active.description}</p>
       </div>
 
       {/* 租户选择器 */}
@@ -78,26 +98,31 @@ export function TopBar() {
         <button
           type="button"
           onClick={() => setPickerOpen((v) => !v)}
-          className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left hover:border-brand-300"
+          className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 text-left shadow-sm transition hover:border-brand-300 sm:px-3"
+          aria-expanded={pickerOpen}
+          aria-haspopup="listbox"
+          aria-label={`切换运营租户，当前：${tenant.name}`}
         >
           <span className="grid h-6 w-6 place-items-center rounded-lg bg-brand-50 text-brand-600">
             <Building2 size={14} />
           </span>
-          <span className="hidden max-w-[240px] truncate text-xs font-semibold text-slate-700 lg:block">
+          <span className="hidden max-w-[240px] truncate text-xs font-semibold text-slate-700 xl:block">
             {tenant.name}
           </span>
           <ChevronDown size={14} className={cn('text-slate-400 transition', pickerOpen && 'rotate-180')} />
         </button>
 
         {pickerOpen && (
-          <div className="absolute right-0 top-[calc(100%+6px)] w-[300px] animate-fade-in rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10">
-            <p className="px-3 py-1.5 text-[11px] font-medium text-slate-400">切换运营租户（X-Tenant-Id）</p>
+          <div role="listbox" aria-label="运营租户" className="absolute right-0 top-[calc(100%+8px)] w-[min(88vw,320px)] animate-fade-in rounded-2xl border border-slate-200 bg-white p-2 shadow-[var(--shadow-float)]">
+            <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">切换运营租户</p>
             {TENANT_OPTIONS.map((t) => (
               <button
                 key={t.id}
                 type="button"
                 onClick={() => chooseTenant(t)}
-                className="flex w-full items-start gap-2 rounded-xl px-3 py-2 text-left hover:bg-brand-50"
+                role="option"
+                aria-selected={t.id === tenant.id}
+                className="flex min-h-12 w-full items-start gap-2 rounded-xl px-3 py-2.5 text-left transition hover:bg-brand-50"
               >
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1 text-xs font-semibold text-slate-700">
@@ -116,7 +141,7 @@ export function TopBar() {
       </div>
 
       {/* 链路状态指示器 */}
-      <div className="hidden items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 md:flex">
+      <div className="hidden h-10 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 md:flex">
         <span className="text-[10px] font-medium uppercase tracking-wide text-slate-400">链路</span>
         <div className="flex items-center gap-3">
           {LINK_META.map(({ key, label }) => (
@@ -129,10 +154,13 @@ export function TopBar() {
       </div>
 
       {/* 时钟 */}
-      <div className="hidden items-center gap-2 rounded-xl bg-brand-900 px-3 py-2 text-brand-100 xl:flex">
+      <div className="hidden h-10 items-center gap-2 rounded-xl bg-brand-900 px-3 text-brand-100 2xl:flex">
         <Clock size={14} className="text-gold-400" />
-        <span className="num text-[13px] tabular-nums text-white">{formatTime(now)}</span>
+        <span className="num min-w-[62px] text-[13px] tabular-nums text-white">{now ? formatTime(now) : '--:--:--'}</span>
       </div>
+      <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-50 text-brand-700 md:hidden" title="服务链路状态">
+        <Wifi size={17} />
+      </span>
     </header>
   );
 }
