@@ -9,6 +9,9 @@ import type {
   AuthLoginResponse,
   MarketingGenerateRequest,
   MarketingGenerateResponse,
+  OrderListParams,
+  OrderSummary,
+  PageResult,
   Product,
   ProductUpsertRequest,
 } from './types';
@@ -100,6 +103,20 @@ export async function updateProduct(id: number, payload: ProductUpsertRequest): 
 
 export async function updateProductStatus(id: number, status: string): Promise<Product> {
   const res = await http.patch<ApiResponse<Product>>(`${API_BASE}/products/${id}/status`, { status });
+  return unwrap(res);
+}
+
+/* ===================== 订单查询 / 出库（GET /orders + POST /orders/{orderNo}/ship） ===================== */
+
+/** 分页查询本租户订单（X-Tenant-Id 由拦截器注入） */
+export async function listOrders(params: OrderListParams = {}): Promise<PageResult<OrderSummary>> {
+  const res = await http.get<ApiResponse<PageResult<OrderSummary>>>(`${API_BASE}/orders`, { params });
+  return unwrap(res);
+}
+
+/** 订单一键出库：履约状态 READY → SHIPPED（非就绪/跨租户由后端抛契约码） */
+export async function shipOrder(orderNo: string): Promise<OrderSummary> {
+  const res = await http.post<ApiResponse<OrderSummary>>(`${API_BASE}/orders/${encodeURIComponent(orderNo)}/ship`);
   return unwrap(res);
 }
 

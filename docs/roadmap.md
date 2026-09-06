@@ -51,11 +51,16 @@
 - [x] 租户上下文（`X-Tenant-Id` → `TenantContextFilter`/`TenantContext` → MDC）
   - [x] JWT 认证 + 登录接口（`POST /api/v1/auth/login`，HS256 手写 JWT + 认证 Filter + PBKDF2 哈希，演示账号 admin/coop001/farmer001）
   - [ ] MyBatis-Plus 自动行级租户隔离（现为手工传 `tenant_id`，未引入 `TenantLineInnerInterceptor`）
-- [x] `web/` B 端：订单列表/履约看板（响应式；当前依赖演示快照 `web/src/lib/demo.ts`）
+- [x] `web/` B 端：订单列表/履约看板（响应式；订单页已接真实 `GET /orders` 与出库接口，看板聚合数字仍用 `demo.ts` 演示）
   - [x] B 端登录页 + 认证态（`/login`，顶栏用户区 + 退出，Bearer Token 持久化）
   - [ ] B 端商品管理页
   - [x] 后端订单列表/详情聚合查询接口（`GET /orders` + `GET /orders/{orderNo}`，含分页/状态/渠道过滤与租户隔离）
-  - [ ] B 端前端接入真实订单列表/分页（⚠️ 依赖后端履约状态/出库接口建模：前端订单页为履约看板 PICKING→READY→SHIPPED，与后端 `OrderStatus` 交易状态域 PENDING_PAY→STOCK_CONFIRMED→PROCESSING→COMPLETED 不一致，需先对齐状态契约再接入）
+  - [x] B 端前端接入真实订单列表/出库（订单页由 demo 快照切换为 `GET /orders` 分页 + `POST /orders/{orderNo}/ship` 一键出库，双状态徽标展示）
+    - [x] 状态域对齐：新增 `FulfillmentStatus`（PENDING/PICKING/READY/SHIPPED/ABNORMAL）独立于交易 `OrderStatus`（PENDING_PAY/STOCK_CONFIRMED/PROCESSING/COMPLETED/CANCELLED），`t_order` 新增 `fulfillment_status` 列，`status`/`fulfillment_status` 双轴解耦
+    - [x] `GET /orders` 支持 `fulfillmentStatus` 过滤；`POST /orders/{orderNo}/ship`（仅 READY→SHIPPED；非就绪/重复出库 409+B2003，不存在/跨租户 404+A1004）
+    - [x] `OrderFulfillmentTest` 出库成功/非就绪409/404/跨租户/重复出库/履约过滤 7 用例通过；`OrderQueryTest` 12 用例通过
+    - [x] `deploy/seed-realistic-data.sql` 交易状态收敛到合法 5 态，并新增 `fulfillment_status` 分布（PENDING→PICKING→READY→SHIPPED + ABNORMAL 样例）
+    - [ ] 存量 PG 升级提示：先 `ALTER TABLE t_order ADD COLUMN fulfillment_status VARCHAR(32) NOT NULL DEFAULT 'PENDING';`（已初始化容器需执行后重跑 `make seed`）
 - [x] OpenAPI 文档（Springdoc + `docs/api-spec.yaml`，当前契约覆盖 `/orders/checkout`、`/qa/ask`）
 
 **完成标准：** Postman 可完成 用户登录 → 创建商品 → 下单 → 扣减库存的闭环。◐ 部分达成（下单/扣库存闭环已通，登录与商品创建缺失）

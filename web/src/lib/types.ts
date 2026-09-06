@@ -122,3 +122,46 @@ export interface AuthLoginResponse {
   expiresIn: number;
   user: UserInfo;
 }
+
+/* ===================== 订单查询 / 出库（GET /orders + POST /orders/{orderNo}/ship） ===================== */
+
+/** 交易状态（与 OrderStatus 枚举对齐，5 态） */
+export type OrderStatus =
+  | 'PENDING_PAY'
+  | 'STOCK_CONFIRMED'
+  | 'PROCESSING'
+  | 'COMPLETED'
+  | 'CANCELLED';
+
+/** 履约状态（与 FulfillmentStatus 枚举对齐 · 出库流水维度，5 态） */
+export type FulfillmentStatus =
+  | 'PENDING'
+  | 'PICKING'
+  | 'READY'
+  | 'SHIPPED'
+  | 'ABNORMAL';
+
+export type OrderSource = 'H5_PRIVATE' | 'DOUYIN' | 'KUAISHOU' | 'B2B_PORTAL';
+
+/** GET /api/v1/orders 列表项摘要（严格对齐 OrderSummaryResponse） */
+export interface OrderSummary {
+  orderNo: string;
+  orderSource: OrderSource;
+  totalAmount: number;
+  status: OrderStatus;
+  fulfillmentStatus: FulfillmentStatus;
+  recipientName: string;
+  createdAt: string;
+}
+
+/** GET /api/v1/orders 查询参数（除分页外的枚举均可省略表示不过滤） */
+export interface OrderListParams {
+  page?: number;
+  pageSize?: number;
+  status?: OrderStatus;
+  fulfillmentStatus?: FulfillmentStatus;
+  orderSource?: OrderSource;
+}
+
+/** POST /api/v1/orders/{orderNo}/ship 成功响应（返回出库后的订单摘要） */
+export type OrderShipResponse = OrderSummary;
