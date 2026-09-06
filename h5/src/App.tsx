@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, RefreshCw, ShoppingBasket, Wheat } from 'lucide-react';
+import { AlertCircle, BadgeCheck, MapPin, RefreshCw, ShoppingBasket, Sprout, Truck, Wheat } from 'lucide-react';
 import TopBar from './components/TopBar';
 import HeroBanner from './components/HeroBanner';
 import CountdownStrip from './components/CountdownStrip';
@@ -62,7 +62,20 @@ function ShopPage() {
     <div className="min-h-screen">
       <TopBar />
 
-      <main className="mx-auto w-full max-w-[430px] pb-24">
+      <div className="shop-layout">
+        <aside className="origin-story" aria-label="于庄助农项目介绍">
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-emerald-50"><Sprout size={14} />河南 · 周口 · 鹿邑</span>
+          <p className="mt-8 text-xs font-semibold uppercase tracking-[0.24em] text-amber-300">FROM FIELD TO TABLE</p>
+          <h1 className="mt-3 text-4xl font-bold leading-[1.18] tracking-[-0.04em] text-white">一份好物，<br />一条更短的助农链路。</h1>
+          <p className="mt-5 max-w-md text-sm leading-7 text-emerald-100/80">由合作社直接连接消费者，让传统工艺、当季农产和真实库存，在同一个轻量入口里被看见。</p>
+          <div className="mt-9 grid max-w-md grid-cols-3 gap-3">
+            <span className="origin-stat"><BadgeCheck size={18} />产地认证</span>
+            <span className="origin-stat"><Truck size={18} />合作社直发</span>
+            <span className="origin-stat"><MapPin size={18} />全程可溯源</span>
+          </div>
+        </aside>
+        <div className="shop-column">
+      <main className="mx-auto w-full max-w-[430px] pb-20">
         <HeroBanner />
         <CountdownStrip />
 
@@ -146,6 +159,8 @@ function ShopPage() {
           本页面经由统一网关 /h5/ 反向代理至 h5 服务
         </p>
       </footer>
+        </div>
+      </div>
 
       {/* 确认下单抽屉 */}
       <CheckoutDrawer

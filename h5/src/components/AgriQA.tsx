@@ -27,14 +27,29 @@ export default function AgriQA() {
   const [messages, setMessages] = useState<QAExchange[]>([]);
   const sessionRef = useRef<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const loadingRef = useRef(false);
+
+  useEffect(() => {
+    loadingRef.current = loading;
+  }, [loading]);
 
   // 锁背景滚动
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    const timer = window.setTimeout(() => inputRef.current?.focus(), 120);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !loadingRef.current) setOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
     return () => {
       document.body.style.overflow = prev;
+      window.clearTimeout(timer);
+      document.removeEventListener('keydown', onKeyDown);
+      triggerRef.current?.focus();
     };
   }, [open]);
 
@@ -74,6 +89,7 @@ export default function AgriQA() {
       {/* 悬浮球 */}
       {!open && (
         <button
+          ref={triggerRef}
           type="button"
           onClick={toggleOpen}
           className="fixed bottom-[calc(env(safe-area-inset-bottom)+18px)] right-4 z-[60] flex items-center gap-2 rounded-full bg-gradient-to-r from-green-700 to-emerald-600 py-2 pl-2 pr-3.5 text-white shadow-xl shadow-green-800/30 active:scale-95"
@@ -93,7 +109,7 @@ export default function AgriQA() {
 
       {/* 问答抽屉 */}
       {open && (
-        <div className="fixed inset-0 z-[70]">
+        <div className="fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-labelledby="agri-qa-title">
           <div
             className="absolute inset-0 animate-fade-in bg-slate-900/50"
             onClick={toggleOpen}
@@ -106,7 +122,7 @@ export default function AgriQA() {
                   <Sparkles size={17} />
                 </span>
                 <div>
-                  <h2 className="text-[15px] font-bold">豫农智汇 · 农技AI助手</h2>
+                  <h2 id="agri-qa-title" className="text-[15px] font-bold">豫农智汇 · 农技AI助手</h2>
                   <p className="text-[10px] text-green-100/90">基于《于庄小麦种植指南》等资料 · 回答可溯源</p>
                 </div>
               </div>
@@ -202,6 +218,7 @@ export default function AgriQA() {
             <div className="border-t border-slate-100 bg-white px-4 py-3">
               <div className="flex items-end gap-2">
                 <textarea
+                  ref={inputRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {

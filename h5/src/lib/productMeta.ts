@@ -48,15 +48,6 @@ export function productTags(p: Product): ProductTag[] {
   return [{ text: '于庄直发', tone: 'green' }];
 }
 
-/** 图片加载失败时的占位 emoji（按品类） */
-export function productEmoji(p: Product): string {
-  const name = p.spuName || '';
-  if (name.includes('香油')) return '🫙';
-  if (name.includes('小麦粉') || name.includes('面粉')) return '🌾';
-  if (name.includes('蜂蜜')) return '🍯';
-  return '🧺';
-}
-
 export interface StockMeta {
   text: string;
   soldOut: boolean;

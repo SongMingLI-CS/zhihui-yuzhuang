@@ -54,10 +54,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ toast }}>
       {children}
-      <div className="pointer-events-none fixed inset-x-0 top-0 z-[90] flex flex-col items-center gap-2 px-6 pt-[calc(env(safe-area-inset-top)+14px)]">
+      <div className="pointer-events-none fixed inset-x-0 top-0 z-[90] flex flex-col items-center gap-2 px-6 pt-[calc(env(safe-area-inset-top)+14px)]" aria-live="polite">
         {items.map((t) => (
           <div
             key={t.id}
+            role="status"
             className="pointer-events-auto flex w-full max-w-[320px] animate-toast-in items-center gap-2 overflow-hidden rounded-xl bg-slate-900/95 py-2.5 pl-3 pr-4 text-[13px] text-white shadow-lg backdrop-blur"
           >
             <span className={`h-6 w-1 rounded-full ${BAR[t.type]}`} />

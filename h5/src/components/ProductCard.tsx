@@ -1,7 +1,7 @@
-import { useState } from 'react';
 import { ShoppingBag, Zap } from 'lucide-react';
 import type { Product } from '../types/api';
-import { productEmoji, productTags, stockMeta, tagClass } from '../lib/productMeta';
+import { productTags, stockMeta, tagClass } from '../lib/productMeta';
+import ProductVisual from './ProductVisual';
 
 /** 大字价格：¥ + 整数 + 小数（可跨卡片/抽屉/弹窗复用） */
 export function Price({ value, big = false }: { value: number; big?: boolean }) {
@@ -29,32 +29,18 @@ interface ProductCardProps {
 
 /** 特产商品卡：图片(带占位兜底) / 标签 / 名称 / 描述 / 大字价 + 实时库存 / 立即抢购 */
 export default function ProductCard({ product, index, onBuy }: ProductCardProps) {
-  const [imgBroken, setImgBroken] = useState(false);
   const tags = productTags(product);
-  const emoji = productEmoji(product);
   const stock = stockMeta(product);
   const soldOut = stock.soldOut;
 
   return (
     <article
-      className="animate-fade-in overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-900/5"
+      className="animate-fade-in overflow-hidden rounded-[20px] border border-green-950/[0.07] bg-white shadow-[0_12px_32px_rgba(36,71,46,.07)]"
       style={{ animationDelay: `${Math.min(index, 6) * 70}ms` }}
     >
       {/* 商品图：后端 imageUrl 为演示占位域名，加载失败回退 emoji 底图 */}
       <div className="relative aspect-[5/3] w-full overflow-hidden bg-gradient-to-br from-green-50 via-emerald-50 to-amber-50">
-        {product.imageUrl && !imgBroken ? (
-          <img
-            src={product.imageUrl}
-            alt={product.spuName}
-            loading="lazy"
-            className="h-full w-full object-cover"
-            onError={() => setImgBroken(true)}
-          />
-        ) : (
-          <div className="grid h-full w-full place-items-center text-[84px] drop-shadow-sm">
-            {emoji}
-          </div>
-        )}
+        <ProductVisual product={product} />
         {soldOut && (
           <div className="absolute inset-0 grid place-items-center bg-slate-900/45 backdrop-blur-[1px]">
             <span className="rounded-full bg-white px-4 py-1 text-[13px] font-bold text-slate-700">
@@ -100,7 +86,7 @@ export default function ProductCard({ product, index, onBuy }: ProductCardProps)
           type="button"
           disabled={soldOut}
           onClick={() => onBuy(product)}
-          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-green-600 to-emerald-500 py-2.5 text-[14px] font-bold text-white shadow-md shadow-green-600/20 transition active:scale-[0.98] disabled:cursor-not-allowed disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 disabled:shadow-none"
+          className="mt-3 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-green-700 py-2.5 text-[14px] font-bold text-white shadow-[0_8px_18px_rgba(21,128,61,.16)] transition hover:bg-green-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
         >
           {soldOut ? <ShoppingBag size={15} /> : <Zap size={15} />}
           {soldOut ? '已抢光' : '立即抢购'}

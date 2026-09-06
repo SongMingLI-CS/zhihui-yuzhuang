@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Check, Clock3, PackageCheck, ShieldCheck, Truck, X } from 'lucide-react';
 import type { OrderCheckoutResponse, Product } from '../types/api';
 import { useCountdown } from '../hooks/useCountdown';
@@ -31,6 +31,8 @@ export default function OrderSuccessModal({
 }) {
   const { toast } = useToast();
   const open = data != null;
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   const { parts, expired } = useCountdown(data?.resp.expireTime ?? null);
 
   const pieces = useMemo(
@@ -47,12 +49,21 @@ export default function OrderSuccessModal({
 
   useEffect(() => {
     if (!open) return;
+    returnFocusRef.current = document.activeElement as HTMLElement;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    const timer = window.setTimeout(() => closeRef.current?.focus(), 120);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
     return () => {
       document.body.style.overflow = prev;
+      window.clearTimeout(timer);
+      document.removeEventListener('keydown', onKeyDown);
+      returnFocusRef.current?.focus();
     };
-  }, [open]);
+  }, [open, onClose]);
 
   if (!data) return null;
   const { resp, product } = data;
@@ -67,7 +78,7 @@ export default function OrderSuccessModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[80] overflow-y-auto">
+    <div className="fixed inset-0 z-[80] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="order-success-title">
       <div className="absolute inset-0 animate-fade-in bg-slate-900/60" onClick={onClose} />
 
       {/* 彩带层 */}
@@ -92,6 +103,7 @@ export default function OrderSuccessModal({
         <div className="w-full animate-pop-success overflow-hidden rounded-3xl bg-white shadow-2xl">
           <div className="relative px-6 pb-6 pt-8 text-center">
             <button
+              ref={closeRef}
               type="button"
               onClick={onClose}
               className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-slate-400 active:scale-95"
@@ -102,7 +114,7 @@ export default function OrderSuccessModal({
             <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-lg shadow-emerald-500/30">
               <Check size={32} strokeWidth={3} />
             </span>
-            <h2 className="mt-3 text-[22px] font-extrabold text-slate-800">抢购成功！</h2>
+            <h2 id="order-success-title" className="mt-3 text-[22px] font-extrabold text-slate-800">抢购成功！</h2>
             <p className="mt-1 text-[12px] text-slate-500">
               「{product.spuName}」已为你锁定
             </p>

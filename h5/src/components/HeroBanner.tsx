@@ -4,13 +4,11 @@ import { BadgeCheck, MapPin, Rocket, Wheat } from 'lucide-react';
 export default function HeroBanner() {
   return (
     <section className="relative mx-auto w-full max-w-[430px] overflow-hidden">
-      <div className="relative mx-4 mt-3 overflow-hidden rounded-2xl bg-gradient-to-br from-green-600 via-emerald-600 to-lime-600 px-5 py-5 text-white shadow-lg shadow-green-700/20">
+      <div className="relative mx-4 mt-3 overflow-hidden rounded-[22px] bg-[#206742] px-5 py-5 text-white shadow-[0_16px_32px_rgba(24,91,57,.18)]">
         {/* 装饰 */}
         <div className="pointer-events-none absolute -right-6 -top-8 h-28 w-28 rounded-full bg-white/10" />
         <div className="pointer-events-none absolute -bottom-10 -right-2 h-24 w-24 rounded-full bg-lime-300/20" />
-        <div className="pointer-events-none absolute -left-3 top-1/2 -translate-y-1/2 text-[64px] opacity-15">
-          🌾
-        </div>
+        <Wheat className="pointer-events-none absolute -left-4 top-1/2 h-24 w-24 -translate-y-1/2 text-white opacity-[0.07]" strokeWidth={1.2} />
 
         <div className="relative">
           <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 px-2 py-0.5 text-[10px] font-semibold tracking-widest text-amber-100 ring-1 ring-amber-200/30">

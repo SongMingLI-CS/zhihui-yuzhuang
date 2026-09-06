@@ -5,7 +5,7 @@ import { checkoutOrder, toApiError } from '../lib/http';
 import { DEMO_RECEIVER, ORDER_SOURCE } from '../config';
 import { useToast } from './Toast';
 import { Price } from './ProductCard';
-import { productEmoji } from '../lib/productMeta';
+import ProductVisual from './ProductVisual';
 
 /** 幂等键：优先 crypto.randomUUID()，非安全上下文回退时间戳随机串 */
 function genIdempotencyKey(): string {
@@ -22,6 +22,12 @@ interface CheckoutDrawerProps {
   onSoldOut: () => void;
 }
 
+interface FieldErrors {
+  recipientName?: string;
+  phone?: string;
+  address?: string;
+}
+
 /** 底部弹出确认下单抽屉：收货人/电话/地址 + 一键演示地址 + 抢购提交状态机 */
 export default function CheckoutDrawer({
   product,
@@ -33,25 +39,40 @@ export default function CheckoutDrawer({
   const [recipientName, setRecipientName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
+  const phoneRef = useRef<HTMLInputElement>(null);
+  const addressRef = useRef<HTMLTextAreaElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const submittingRef = useRef(false);
   const open = product != null;
+
+  useEffect(() => {
+    submittingRef.current = submitting;
+  }, [submitting]);
 
   // 打开时锁背景滚动并自动聚焦首字段
   useEffect(() => {
     if (!open) return;
+    returnFocusRef.current = document.activeElement as HTMLElement;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    setErrors({});
     const t = window.setTimeout(() => nameRef.current?.focus(), 340);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !submittingRef.current) onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
     return () => {
       document.body.style.overflow = prev;
       window.clearTimeout(t);
+      document.removeEventListener('keydown', onKeyDown);
+      returnFocusRef.current?.focus();
     };
-  }, [open]);
+  }, [open, onClose]);
 
   if (!product) return null;
-
-  const emoji = productEmoji(product);
 
   const handleClose = () => {
     if (!submitting) onClose();
@@ -61,6 +82,7 @@ export default function CheckoutDrawer({
     setRecipientName(DEMO_RECEIVER.recipientName);
     setPhone(DEMO_RECEIVER.phone);
     setAddress(DEMO_RECEIVER.detailedAddress);
+    setErrors({});
     toast('info', '已填入演示收货地址');
   };
 
@@ -69,16 +91,21 @@ export default function CheckoutDrawer({
     const name = recipientName.trim();
     const tel = phone.trim();
     const addr = address.trim();
+    const nextErrors: FieldErrors = {};
+    if (!name) nextErrors.recipientName = '请填写收货人姓名';
+    if (!/^1[3-9]\d{9}$/.test(tel)) nextErrors.phone = '请输入正确的 11 位手机号';
+    if (addr.length < 8) nextErrors.address = '请填写至少 8 个字的详细地址';
+    setErrors(nextErrors);
     if (!name) {
-      toast('error', '请填写收货人姓名');
+      nameRef.current?.focus();
       return;
     }
     if (!/^1[3-9]\d{9}$/.test(tel)) {
-      toast('error', '请填写正确的 11 位手机号');
+      phoneRef.current?.focus();
       return;
     }
     if (addr.length < 8) {
-      toast('error', '请填写详细收货地址');
+      addressRef.current?.focus();
       return;
     }
     if (submitting) return;
@@ -109,15 +136,15 @@ export default function CheckoutDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-[70]">
+    <div className="fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-labelledby="checkout-title">
       <div className="absolute inset-0 animate-fade-in bg-slate-900/55" onClick={handleClose} />
 
-      <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-[430px] animate-slide-up rounded-t-3xl bg-white safe-bottom">
+      <div className="scrollbar-thin absolute inset-x-0 bottom-0 mx-auto max-h-[94dvh] w-full max-w-[430px] animate-slide-up overflow-y-auto rounded-t-3xl bg-white safe-bottom">
         {/* 头部 */}
         <div className="flex items-center justify-between px-5 pb-1 pt-4">
           <div className="flex items-center gap-2">
             <Zap size={17} className="text-amber-500" />
-            <h2 className="text-[16px] font-extrabold text-slate-800">确认抢购</h2>
+            <h2 id="checkout-title" className="text-[16px] font-extrabold text-slate-800">确认抢购</h2>
           </div>
           <button
             type="button"
@@ -131,9 +158,7 @@ export default function CheckoutDrawer({
 
         {/* 商品摘要 */}
         <div className="mx-5 mt-2 flex items-center gap-3 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100">
-          <span className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-xl bg-gradient-to-br from-green-100 to-amber-50 text-[30px]">
-            {emoji}
-          </span>
+          <span className="h-14 w-14 shrink-0 overflow-hidden rounded-xl"><ProductVisual product={product} compact /></span>
           <div className="min-w-0 flex-1">
             <p className="line-clamp-1 text-[14px] font-bold text-slate-800">{product.spuName}</p>
             <p className="mt-0.5 text-[11px] text-slate-400">于庄合作社直发 · 数量 1</p>
@@ -145,7 +170,7 @@ export default function CheckoutDrawer({
         <form onSubmit={handleSubmit} className="mt-3 space-y-3 px-5 pb-2">
           <div>
             <div className="flex items-center justify-between">
-              <label className="mb-1 block text-[12px] font-semibold text-slate-600">收货人</label>
+              <label htmlFor="receiver-name" className="mb-1 block text-[12px] font-semibold text-slate-600">收货人 <span className="text-red-500">*</span></label>
               <button
                 type="button"
                 onClick={fillDemo}
@@ -157,36 +182,50 @@ export default function CheckoutDrawer({
             </div>
             <input
               ref={nameRef}
+              id="receiver-name"
               value={recipientName}
-              onChange={(e) => setRecipientName(e.target.value)}
+              onChange={(e) => { setRecipientName(e.target.value); setErrors((prev) => ({ ...prev, recipientName: undefined })); }}
               placeholder="请输入收货人姓名"
               maxLength={30}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[14px] placeholder:text-slate-300 focus:border-green-500 focus:bg-white focus:ring-2 focus:ring-green-100"
+              aria-invalid={Boolean(errors.recipientName)}
+              aria-describedby={errors.recipientName ? 'receiver-name-error' : undefined}
             />
+            {errors.recipientName && <p id="receiver-name-error" className="mt-1 text-[11px] font-medium text-red-600">{errors.recipientName}</p>}
           </div>
 
           <div>
-            <label className="mb-1 block text-[12px] font-semibold text-slate-600">联系电话</label>
+            <label htmlFor="receiver-phone" className="mb-1 block text-[12px] font-semibold text-slate-600">联系电话 <span className="text-red-500">*</span></label>
             <input
+              ref={phoneRef}
+              id="receiver-phone"
               value={phone}
-              onChange={(e) => setPhone(e.target.value.replace(/[^\d]/g, ''))}
+              onChange={(e) => { setPhone(e.target.value.replace(/[^\d]/g, '')); setErrors((prev) => ({ ...prev, phone: undefined })); }}
               placeholder="请输入 11 位手机号"
               inputMode="numeric"
               maxLength={11}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[14px] placeholder:text-slate-300 focus:border-green-500 focus:bg-white focus:ring-2 focus:ring-green-100"
+              aria-invalid={Boolean(errors.phone)}
+              aria-describedby={errors.phone ? 'receiver-phone-error' : undefined}
             />
+            {errors.phone && <p id="receiver-phone-error" className="mt-1 text-[11px] font-medium text-red-600">{errors.phone}</p>}
           </div>
 
           <div>
-            <label className="mb-1 block text-[12px] font-semibold text-slate-600">收货地址</label>
+            <label htmlFor="receiver-address" className="mb-1 block text-[12px] font-semibold text-slate-600">收货地址 <span className="text-red-500">*</span></label>
             <textarea
+              ref={addressRef}
+              id="receiver-address"
               value={address}
-              onChange={(e) => setAddress(e.target.value)}
+              onChange={(e) => { setAddress(e.target.value); setErrors((prev) => ({ ...prev, address: undefined })); }}
               placeholder="省市区 + 详细地址"
               rows={2}
               maxLength={120}
               className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[14px] placeholder:text-slate-300 focus:border-green-500 focus:bg-white focus:ring-2 focus:ring-green-100"
+              aria-invalid={Boolean(errors.address)}
+              aria-describedby={errors.address ? 'receiver-address-error' : undefined}
             />
+            {errors.address && <p id="receiver-address-error" className="mt-1 text-[11px] font-medium text-red-600">{errors.address}</p>}
           </div>
 
           <div className="flex items-center gap-1.5 rounded-xl bg-slate-50 px-3 py-2 text-[11px] text-slate-400">

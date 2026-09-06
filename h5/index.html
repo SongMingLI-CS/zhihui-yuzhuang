@@ -2,18 +2,27 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- 部署于 /h5/ 子路径：用 %BASE_URL% 占位符，构建后自动输出 /h5/favicon.svg -->
+    <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <meta name="theme-color" content="#15803d" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="智汇于庄" />
+    <meta name="format-detection" content="telephone=no, email=no, address=no" />
     <meta
       name="description"
       content="周口鹿邑试量镇特产直供 · 乡村振兴示范专场 · 智汇于庄特色产业数字助农"
     />
+    <!-- 阻止 iOS 长按图片/链接的默认弹窗，保持秒杀页操作手感 -->
+    <style>
+      img,
+      a {
+        -webkit-touch-callout: none;
+      }
+    </style>
     <title>智汇于庄 · 特色产业数字助农</title>
   </head>
   <body>
