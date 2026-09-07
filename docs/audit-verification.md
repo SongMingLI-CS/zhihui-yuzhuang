@@ -85,9 +85,9 @@
 | `46d38ae` | backend：`AuthGuardInterceptor` + `AuthContext.require()` + JWT 租户绑定 + 商品写跨租户修复（含 global 目录 VILLAGE 规则） |
 | `079e308` | backend tests：WebContractTest/ProductAdminTest/OrderQuery/Fulfillment 对抗与回归；全量 **86/86 绿**（H2 test profile） |
 | `ab5cc11` | web：登录租户锁定 + 顶栏选择器登录态禁用 + 401 自动回登录 + lint 修复 |
-| `待提交（阶段2-A）` | backend：Flyway 依赖/配置/关闭（test H2 关闭）+ V1 基线 + V2 支付列迁移 + compose/seed 接入 |
-| `待提交（阶段2-B）` | backend：支付沙箱 + 超时关单调度 + 幂等库存回补 + 相关测试（94/94 绿） |
-| `待提交（docs2）` | docs：api-spec 沙箱支付端点 + payment-closeout-design + 台账更新 |
+| `45140e5` | backend（阶段2-A/B）：Flyway 迁移 V1/V2 + compose 接入 + 支付沙箱/超时关单/幂等库存回补/调度器 |
+| `495f9bf` | backend tests：OrderPaymentClosureTest（幂等/并发单胜/库存只回补一次/端点契约）→ **94/94 绿** |
+| `baa20ff` | docs：api-spec 沙箱支付端点 + payment-closeout-design + 台账更新 |
 
 ### 6.2 验证命令与结果
 - `cd backend && mvn test`：全量 **Tests run 94, Failures 0, Errors 0**（H2 test profile，含支付/关单对抗用例）。
