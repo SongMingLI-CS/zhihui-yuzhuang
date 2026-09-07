@@ -20,6 +20,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.mockito.ArgumentCaptor;
 
 import java.util.HashMap;
+import java.time.LocalDateTime;
+
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,6 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -149,7 +152,7 @@ class OutboxRedisStreamIntegrationTest {
         assertThat(reloaded.getRetryCount()).isEqualTo(5);
 
         // 已达上限：不再出现在待投递批次（避免无限重试拖垮）
-        assertThat(outboxEventMapper.selectPendingBatch(50, 5)).isEmpty();
+        assertThat(outboxEventMapper.selectClaimableBatch(50, 5, LocalDateTime.now())).isEmpty();
     }
 
     // ============================================================
@@ -217,8 +220,51 @@ class OutboxRedisStreamIntegrationTest {
         // 4) 状态闭环：PROCESSED 且不再有残留 PENDING/PUBLISHED（无死锁）
         assertThat(outboxEventMapper.selectById(seeded.getId()).getStatus())
                 .isEqualTo(OutboxStatus.PROCESSED.name());
-        assertThat(outboxEventMapper.selectPendingBatch(50, 5)).isEmpty();
+        assertThat(outboxEventMapper.selectClaimableBatch(50, 5, LocalDateTime.now())).isEmpty();
         verify(streamOps).acknowledge(eq(STREAM), eq(GROUP), eq(message.getId()));
+    }
+
+    // ============================================================
+    // F. 发布端租约：多实例防重复 XADD / 认领崩溃后租约到期接管
+    // ============================================================
+
+    @Test
+    @DisplayName("实例A持有有效租约 → 实例B扫描跳过（不重复 XADD）")
+    void lease_heldByOtherInstance_secondInstanceSkips() {
+        LocalDateTime now = LocalDateTime.now();
+        OutboxEvent held = seedOutboxClaimed("PENDING", 0, "ORD-L-0006",
+                now, now.plusMinutes(2), "instance-A");
+
+        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        StreamOperations<String, Object, Object> streamOps = mock(StreamOperations.class);
+        when(redis.opsForStream()).thenReturn(streamOps);
+        when(streamOps.add(eq(STREAM), anyMap())).thenReturn(RecordId.of("1750000000006-0"));
+
+        OutboxSweeper sweeperB = new OutboxSweeper(redis, outboxEventMapper);
+        assertThat(sweeperB.publishPendingBatch(50, 5)).isZero();
+        verify(streamOps, never()).add(eq(STREAM), anyMap());
+        assertThat(outboxEventMapper.selectById(held.getId()).getStatus())
+                .isEqualTo(OutboxStatus.PENDING.name());
+    }
+
+    @Test
+    @DisplayName("认领实例崩溃且租约过期 → 实例B自动接管并发布（消息不丢）")
+    void lease_expiredAfterCrashedInstance_secondInstancePublishes() {
+        LocalDateTime now = LocalDateTime.now();
+        OutboxEvent expired = seedOutboxClaimed("PENDING", 0, "ORD-L-0007",
+                now.minusMinutes(5), now.minusMinutes(4), "instance-A");
+
+        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        StreamOperations<String, Object, Object> streamOps = mock(StreamOperations.class);
+        when(redis.opsForStream()).thenReturn(streamOps);
+        when(streamOps.add(eq(STREAM), anyMap())).thenReturn(RecordId.of("1750000000007-0"));
+
+        OutboxSweeper sweeperB = new OutboxSweeper(redis, outboxEventMapper);
+        assertThat(sweeperB.publishPendingBatch(50, 5)).isEqualTo(1);
+        verify(streamOps).add(eq(STREAM), anyMap());
+        OutboxEvent reloaded = outboxEventMapper.selectById(expired.getId());
+        assertThat(reloaded.getStatus()).isEqualTo(OutboxStatus.PUBLISHED.name());
+        assertThat(reloaded.getInstanceId()).isNull();
     }
 
     // ============================================================
@@ -238,6 +284,17 @@ class OutboxRedisStreamIntegrationTest {
                 .retryCount(retryCount)
                 .build();
         outboxEventMapper.insert(event);
+        return event;
+    }
+
+    /** 带租约认领字段的种子事件（模拟其他实例已认领 / 认领后崩溃）。 */
+    private OutboxEvent seedOutboxClaimed(String status, int retryCount, String orderNo,
+                                          LocalDateTime claimedAt, LocalDateTime leaseUntil, String instanceId) {
+        OutboxEvent event = seedOutbox(status, retryCount, orderNo);
+        event.setClaimedAt(claimedAt);
+        event.setLeaseUntil(leaseUntil);
+        event.setInstanceId(instanceId);
+        outboxEventMapper.updateById(event);
         return event;
     }
 }

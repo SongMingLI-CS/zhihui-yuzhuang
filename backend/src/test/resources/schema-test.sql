@@ -71,6 +71,9 @@ CREATE TABLE IF NOT EXISTS t_outbox_event (
     payload         TEXT,
     status          VARCHAR(16)  NOT NULL DEFAULT 'PENDING',
     retry_count     INT          NOT NULL DEFAULT 0,
+    claimed_at      TIMESTAMP,
+    lease_until     TIMESTAMP,
+    instance_id     VARCHAR(64),
     created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
