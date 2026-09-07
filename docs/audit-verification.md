@@ -74,7 +74,26 @@
 - AI 端点无身份/限流治理；AI 评测缺门槛基线。
 - 数据库迁移与生产部署动作需在部署环境执行（本机 Docker 5432/8080 被占用，无法本地跑 go-live）。
 
-## 六、验证状态
-- backend `mvn -q test`（H2 test profile）：阶段1完成后全绿（基线 31 + 新增对抗/回归用例）。
-- web：`npx tsc --noEmit` 通过。
-- 提交粒度：docs → backend(安全切片) → backend(tests) → web，按模块隔离。
+## 六、实现与验证状态
+
+### 6.1 提交记录（本切片）
+| 提交 | 内容 |
+|---|---|
+| `af95c6f` | docs：核查台账 + api-spec 鉴权标注（BearerAuth/受保护端点）+ 根文档 5433 对齐 |
+| `46d38ae` | backend：`AuthGuardInterceptor` + `AuthContext.require()` + JWT 租户绑定 + 商品写跨租户修复（含 global 目录 VILLAGE 规则） |
+| `079e308` | backend tests：WebContractTest/ProductAdminTest/OrderQuery/Fulfillment 对抗与回归；全量 **86/86 绿**（H2 test profile） |
+| `ab5cc11` | web：登录租户锁定 + 顶栏选择器登录态禁用 + 401 自动回登录 + lint 修复 |
+
+### 6.2 验证命令与结果
+- `cd backend && mvn test`：全量 **Tests run 86, Failures 0, Errors 0**（H2 test profile，含新增对抗/回归/契约用例）。
+- `cd web && npm run typecheck`：通过；`npm run lint`：No warnings or errors；`npm run test`：2/2 通过。
+- h5 / ai-service：本切片未改其代码（仅 ai-service 模块内端口文档遗留，归其模块后续修正）。
+
+### 6.3 残留风险（后续立项跟踪）
+- 支付/关单/库存补偿闭环（阶段2）。
+- Flyway 基线迁移（阶段2）。
+- C 端下单仍以 header 表达店铺租户（匿名无身份，接入消费者登录后收敛）。
+- Outbox claim/SKIP LOCKED、AI 端点治理与评测门槛、dashboard/knowledge demo 数据收敛（阶段3）。
+- 商品 `version` 列已存在但未启用乐观锁（`@Version`），本切片用「加载+作用域校验+条件更新」兜底；完整 OCC 与 Flyway 一并推进。
+- ai-service 模块内 `DATABASE_URL`/文档的 5432 表述与宿主机 5433 对齐，留待 ai-service 模块维护时处理（避免越模块改动）。
+
