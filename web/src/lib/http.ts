@@ -15,6 +15,7 @@ import type {
   PageResult,
   Product,
   ProductUpsertRequest,
+  DashboardSummary,
 } from './types';
 
 /** 业务/网络错误统一封装（携带契约 code 与 HTTP 状态） */
@@ -107,6 +108,13 @@ export function toApiError(err: unknown): ApiError {
 
 export async function login(payload: AuthLoginRequest): Promise<AuthLoginResponse> {
   const res = await http.post<ApiResponse<AuthLoginResponse>>(`${API_BASE}/auth/login`, payload);
+  return unwrap(res);
+}
+
+/* ===================== 经营大盘（GET /api/v1/dashboard/summary） ===================== */
+
+export async function fetchDashboardSummary(): Promise<DashboardSummary> {
+  const res = await http.get<ApiResponse<DashboardSummary>>(`${API_BASE}/dashboard/summary`);
   return unwrap(res);
 }
 

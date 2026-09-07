@@ -41,6 +41,34 @@ export interface ProductStatusRequest {
   status: string;
 }
 
+/* ===================== 经营大盘（GET /api/v1/dashboard/summary） ===================== */
+
+export interface DashboardTrendItem {
+  date: string; // yyyy-MM-dd
+  orderCount: number;
+  salesAmount: number;
+}
+
+export interface DashboardTopProduct {
+  skuId: number;
+  spuName: string;
+  quantity: number;
+  salesAmount: number;
+}
+
+export interface DashboardSummary {
+  tenantId: string;
+  snapshotAt: number;
+  totalOrders: number;
+  totalSales: number;
+  todayOrders: number;
+  todaySales: number;
+  pendingPayOrders: number;
+  readyShipOrders: number;
+  trend: DashboardTrendItem[];
+  topProducts: DashboardTopProduct[];
+}
+
 /* ===================== 农技问答（POST /ai/v1/qa/ask） ===================== */
 
 export type AgriCategory = 'DISEASE_PEST' | 'FERTILIZER' | 'POLICY' | 'GENERAL';

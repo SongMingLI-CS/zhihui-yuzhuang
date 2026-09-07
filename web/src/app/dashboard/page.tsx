@@ -2,37 +2,68 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Activity,
   Info,
+  PackageCheck,
   PieChart,
   Radio,
   ShoppingCart,
-  Sparkles,
+  Timer,
   TrendingUp,
   Wallet,
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { TrendChart } from '@/components/dashboard/TrendChart';
 import { SalesShareChart } from '@/components/dashboard/SalesShareChart';
-import { RealtimeFeed, type FeedStats } from '@/components/dashboard/RealtimeFeed';
-import { METRICS, SALES_SHARE, buildTrend } from '@/lib/demo';
+import { RealtimeFeed } from '@/components/dashboard/RealtimeFeed';
+import { fetchDashboardSummary } from '@/lib/http';
 import { formatDate, formatInt, formatYuan } from '@/lib/format';
+import type { SalesShareItem, TrendPoint } from '@/lib/demo';
+
+/** RealtimeFeed 客户端模拟的基准事件速率（仅作流语义演示基线，非经营数据）。 */
+const FEED_TPS = 60;
+
+const SHARE_COLORS = ['#2c724a', '#e9b949', '#c26e4b', '#5b8ff9', '#8fc9a2'];
 
 export default function DashboardPage() {
   const [today, setToday] = useState<Date | null>(null);
-  const [liveStats, setLiveStats] = useState<FeedStats>({
-    total: 0,
-    perMin: METRICS.outboxTps,
-  });
-  // 趋势数据为静态演示快照，缓存避免实时流水每秒触发整个页面时重建数组、重绘图表
-  const trend = useMemo(() => buildTrend(7), []);
-
   useEffect(() => setToday(new Date()), []);
 
-  const onFeedStats = (stats: FeedStats) => setLiveStats(stats);
+  // 实时流水仅作客户端流语义演示，不联动真实经营指标
+  const handleFeedStats = () => { /* no-op */ };
+
+  // 经营数据全部来自 backend 真实聚合（JWT 租户域），每 60s 自动刷新
+  const summaryQuery = useQuery({
+    queryKey: ['dashboard', 'summary'],
+    queryFn: fetchDashboardSummary,
+    refetchInterval: 60_000,
+  });
+  const summary = summaryQuery.data;
+
+  const trend = useMemo<TrendPoint[]>(
+    () =>
+      (summary?.trend ?? []).map((d) => {
+        const [, mm, dd] = d.date.split('-');
+        return { label: `${mm}-${dd}`, orders: d.orderCount, revenue: d.salesAmount };
+      }),
+    [summary],
+  );
+
+  const salesShare = useMemo<SalesShareItem[]>(() => {
+    const items = summary?.topProducts ?? [];
+    const total = items.reduce((s, p) => s + p.salesAmount, 0) || 1;
+    return items.map((p, i) => ({
+      name: p.spuName,
+      value: Math.round((p.salesAmount / total) * 1000) / 10,
+      amount: p.salesAmount,
+      color: SHARE_COLORS[i % SHARE_COLORS.length],
+    }));
+  }, [summary]);
+
+  const failed = summaryQuery.isError;
 
   return (
     <div className="page-stack">
@@ -40,43 +71,41 @@ export default function DashboardPage() {
         eyebrow="OPERATIONS OVERVIEW"
         title="产业治理大盘"
         description={`于庄合作社今日经营快照 · ${today ? formatDate(today) : '今日'}`}
-        actions={<Badge tone="amber"><Info size={12} />演示数据</Badge>}
+        actions={
+          <Badge tone={failed ? 'red' : 'green'}>
+            <Info size={12} />
+            {failed ? '加载失败' : '实时经营数据'}
+          </Badge>
+        }
       />
-
-      {/* 指标卡 */}
+      {/* 指标卡（真实聚合，非取消口径交易额） */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:gap-4 2xl:grid-cols-4">
         <MetricCard
-          label="累计助农销售额"
-          value={formatYuan(METRICS.cumulativeSales)}
-          delta={12.4}
-          deltaSuffix="%"
-          hint="较年初 · 覆盖 3 大特产 SKU"
+          label="累计助农交易额"
+          value={formatYuan(summary?.totalSales ?? 0)}
+          hint="非取消口径 · 本租户全渠道"
           icon={<Wallet size={20} />}
           iconClass="bg-brand-50 text-brand-600"
         />
         <MetricCard
           label="今日订单数"
-          value={formatInt(METRICS.todayOrders)}
-          delta={8.6}
-          deltaSuffix="%"
-          hint="全渠道聚合 · 含 B2B 集采"
+          value={formatInt(summary?.todayOrders ?? 0)}
+          hint="本租户 · 实时聚合"
           icon={<ShoppingCart size={20} />}
           iconClass="bg-sky-50 text-sky-600"
         />
         <MetricCard
-          label="农技 RAG 服务人次"
-          value={formatInt(METRICS.ragCalls)}
-          delta={23.1}
-          deltaSuffix="%"
-          hint="知识库检索 + DeepSeek 生成"
-          icon={<Sparkles size={20} />}
-          iconClass="bg-violet-50 text-violet-600"
+          label="待出库订单"
+          value={formatInt(summary?.readyShipOrders ?? 0)}
+          hint="履约 READY · 待一键出库"
+          icon={<PackageCheck size={20} />}
+          iconClass="bg-emerald-50 text-emerald-600"
         />
         <MetricCard
-          label="Outbox 削峰吞吐"
-          value={`${liveStats.perMin} 条/分`}
-          hint="实时削峰窗口 · 异步消费"
-          icon={<Activity size={20} />}
+          label="待支付锁定"
+          value={formatInt(summary?.pendingPayOrders ?? 0)}
+          hint="超时自动关单 · 库存回补"
+          icon={<Timer size={20} />}
           iconClass="bg-amber-50 text-amber-600"
         />
       </div>
@@ -87,7 +116,7 @@ export default function DashboardPage() {
           className="col-span-12 xl:col-span-8"
           icon={<TrendingUp size={16} />}
           title="近 7 日订单 / 营收趋势"
-          subtitle="订单量（左轴）与 销售额（右轴）· 演示快照"
+          subtitle="订单量（左轴）与 销售额（右轴）· 实时聚合"
         >
           <TrendChart data={trend} height={290} />
         </Card>
@@ -95,13 +124,13 @@ export default function DashboardPage() {
         <Card
           className="col-span-12 md:col-span-6 xl:col-span-4"
           icon={<PieChart size={16} />}
-          title="销售占比 · 于庄三宝"
-          subtitle="按销售额口径 · 演示快照"
+          title="商品销量占比"
+          subtitle="按销量 TOP 明细汇总 · 实时聚合"
         >
-          <SalesShareChart data={SALES_SHARE} height={210} />
+          <SalesShareChart data={salesShare} height={210} />
         </Card>
 
-        {/* 实时流水（Redis Streams 异步消费） */}
+        {/* 实时流水（Redis Streams 消费语义的客户端演示，非经营数据） */}
         <Card
           className="col-span-12 md:col-span-6 xl:col-span-12"
           icon={<Radio size={16} />}
@@ -109,7 +138,7 @@ export default function DashboardPage() {
           subtitle="出库就绪 / 拣货派单 / 削峰写流动态滚动 · 客户端语义模拟"
           bodyClassName="p-0"
         >
-          <RealtimeFeed baseline={METRICS.outboxTps} onStats={onFeedStats} />
+          <RealtimeFeed baseline={FEED_TPS} onStats={handleFeedStats} />
         </Card>
       </div>
     </div>
