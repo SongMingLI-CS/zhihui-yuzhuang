@@ -2,6 +2,7 @@ package com.yuzhuang.order.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yuzhuang.common.api.PageResult;
+import com.yuzhuang.common.context.TenantContext;
 import com.yuzhuang.common.enums.ResultCode;
 import com.yuzhuang.common.exception.BusinessException;
 import com.yuzhuang.order.dto.OrderDetailResponse;
@@ -30,8 +31,6 @@ import java.util.List;
 @Service
 public class OrderQueryServiceImpl implements OrderQueryService {
 
-    /** 缺省租户标识（与 TenantContext / 契约缺省一致） */
-    private static final String DEFAULT_TENANT_ID = "global";
 
     /** 分页缺省与上限 */
     private static final int DEFAULT_PAGE = 1;
@@ -57,7 +56,7 @@ public class OrderQueryServiceImpl implements OrderQueryService {
                                                        FulfillmentStatus fulfillmentStatus,
                                                        String keyword, OrderSource orderSource,
                                                        int page, int pageSize) {
-        String tenant = normalizeTenantId(tenantId);
+        String tenant = TenantContext.normalizeTenantId(tenantId);
         int p = page <= 0 ? DEFAULT_PAGE : page;
         int size = pageSize <= 0 ? DEFAULT_PAGE_SIZE : Math.min(pageSize, MAX_PAGE_SIZE);
 
@@ -99,7 +98,7 @@ public class OrderQueryServiceImpl implements OrderQueryService {
 
     @Override
     public OrderDetailResponse getOrderDetail(String tenantId, String orderNo) {
-        String tenant = normalizeTenantId(tenantId);
+        String tenant = TenantContext.normalizeTenantId(tenantId);
         if (orderNo == null || orderNo.isBlank()) {
             throw new BusinessException(ResultCode.PARAM_ERROR, "订单号不能为空");
         }
@@ -114,10 +113,6 @@ public class OrderQueryServiceImpl implements OrderQueryService {
         return toDetail(order, orderItems);
     }
 
-    /** 租户规整：null/空白回退 {@code global}。 */
-    private String normalizeTenantId(String tenantId) {
-        return (tenantId == null || tenantId.isBlank()) ? DEFAULT_TENANT_ID : tenantId.trim();
-    }
 
     /** 实体 → 列表摘要。 */
     private OrderSummaryResponse toSummary(Order order) {

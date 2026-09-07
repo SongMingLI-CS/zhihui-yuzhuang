@@ -3,6 +3,8 @@ package com.yuzhuang.order;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yuzhuang.common.constant.HeaderNames;
 import com.yuzhuang.common.context.TenantContext;
+import com.yuzhuang.common.enums.ResultCode;
+import com.yuzhuang.common.exception.BusinessException;
 import com.yuzhuang.order.entity.Order;
 
 import com.yuzhuang.order.enums.FulfillmentStatus;
@@ -10,6 +12,7 @@ import com.yuzhuang.order.enums.OrderSource;
 import com.yuzhuang.order.enums.OrderStatus;
 import com.yuzhuang.order.mapper.OrderItemMapper;
 import com.yuzhuang.order.mapper.OrderMapper;
+import com.yuzhuang.order.service.OrderFulfillmentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +23,13 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -44,6 +54,8 @@ class OrderFulfillmentTest {
     private OrderItemMapper orderItemMapper;
     @Autowired
     private MockMvc mockMvc;
+    @Autowired
+    private OrderFulfillmentService orderFulfillmentService;
 
     @BeforeEach
     void cleanTables() {
@@ -121,6 +133,47 @@ class OrderFulfillmentTest {
                         .header(HeaderNames.X_TENANT_ID, TENANT_A))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("B2003"));
+    }
+
+    @Test
+    void ship_concurrentDoubleAttempt_exactlyOneWins() throws Exception {
+        seedOrder(TENANT_A, "ORD-CONC-1", "STOCK_CONFIRMED", "READY", "H5_PRIVATE");
+
+        int workers = 2;
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(workers);
+        List<Future<Boolean>> futures = new ArrayList<>();
+        try {
+            for (int i = 0; i < workers; i++) {
+                futures.add(pool.submit(() -> {
+                    start.await();
+                    try {
+                        orderFulfillmentService.shipOrder(TENANT_A, "ORD-CONC-1");
+                        return true;
+                    } catch (BusinessException e) {
+                        if (ResultCode.ORDER_STATE_CONFLICT.getCode().equals(e.getCode())) {
+                            return false;
+                        }
+                        throw e;
+                    }
+                }));
+            }
+            start.countDown();
+            List<Boolean> results = new ArrayList<>();
+            for (Future<Boolean> f : futures) {
+                results.add(f.get(15, TimeUnit.SECONDS));
+            }
+            long success = results.stream().filter(Boolean::booleanValue).count();
+            assertThat(success).as("恰好一个并发线程出库成功").isEqualTo(1);
+            assertThat(results.size() - success).as("另一并发线程应命中 B2003 冲突").isEqualTo(1);
+
+            Order persisted = orderMapper.selectOne(new LambdaQueryWrapper<Order>()
+                    .eq(Order::getTenantId, TENANT_A)
+                    .eq(Order::getOrderNo, "ORD-CONC-1"));
+            assertThat(persisted.getFulfillmentStatus()).isEqualTo(FulfillmentStatus.SHIPPED);
+        } finally {
+            pool.shutdownNow();
+        }
     }
 
     @Test

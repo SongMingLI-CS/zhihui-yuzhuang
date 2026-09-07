@@ -21,7 +21,12 @@ public final class TenantContext {
 
     /** 设置当前线程租户；空串/空白回退 {@code global}。 */
     public static void setTenantId(String tenantId) {
-        HOLDER.set((tenantId == null || tenantId.isBlank()) ? DEFAULT_TENANT_ID : tenantId.trim());
+        HOLDER.set(normalizeTenantId(tenantId));
+    }
+
+    /** 规整租户标识：null/空白回退 {@code global}，否则去除首尾空白（永不返回 null）。 */
+    public static String normalizeTenantId(String tenantId) {
+        return (tenantId == null || tenantId.isBlank()) ? DEFAULT_TENANT_ID : tenantId.trim();
     }
 
     /** 获取当前线程租户（永不返回 null）。 */

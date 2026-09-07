@@ -58,7 +58,7 @@ public class OrderFulfillmentServiceImpl implements OrderFulfillmentService {
     /** 通用推进：仅允许 {@code from → to}，条件更新影响行数为 0 时判定并发/状态不符。 */
     private OrderSummaryResponse transition(String tenantId, String orderNo,
                                             FulfillmentStatus from, FulfillmentStatus to, String action) {
-        String tenant = normalizeTenantId(tenantId);
+        String tenant = TenantContext.normalizeTenantId(tenantId);
         String no = (orderNo == null || orderNo.isBlank()) ? null : orderNo.trim();
         if (no == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR, "订单号不能为空");
@@ -96,11 +96,6 @@ public class OrderFulfillmentServiceImpl implements OrderFulfillmentService {
         };
     }
 
-    /** 租户规整：null/空白回退 {@code global}。 */
-    private String normalizeTenantId(String tenantId) {
-        return (tenantId == null || tenantId.isBlank())
-                ? TenantContext.DEFAULT_TENANT_ID : tenantId.trim();
-    }
 
     /** 实体 → 推进后订单摘要。 */
     private OrderSummaryResponse toSummary(Order order) {
