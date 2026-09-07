@@ -50,6 +50,15 @@ public class OutboxEvent {
     /** 已重试次数 */
     private Integer retryCount;
 
+    /** 认领时间（发布端租约，防多实例重复 XADD） */
+    private LocalDateTime claimedAt;
+
+    /** 租约到期时间：到期后其他实例可重新认领（崩溃恢复） */
+    private LocalDateTime leaseUntil;
+
+    /** 持有租约的发布实例标识（诊断用） */
+    private String instanceId;
+
     /** 创建时间 */
     private LocalDateTime createdAt;
 }

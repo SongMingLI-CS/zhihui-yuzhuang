@@ -78,6 +78,9 @@ yuzhuang:
     scan-interval-ms: ${OUTBOX_SCAN_INTERVAL_MS:2000}
     batch-size: ${OUTBOX_BATCH_SIZE:50}
     max-retry: ${OUTBOX_MAX_RETRY:5}
+    # 发布端租约：多实例并发下单事件仅一个实例发布；认领后崩溃由租约到期自动接管
+    lease-seconds: ${OUTBOX_LEASE_SECONDS:60}
+    instance-id: ${OUTBOX_INSTANCE_ID:}
 
   # 订单支付超时与超时关单（PAY_TIMEOUT 取消 + 幂等库存回补）
   order:
