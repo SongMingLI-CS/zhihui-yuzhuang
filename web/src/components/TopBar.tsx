@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Building2, Check, ChevronDown, Clock, LogIn, LogOut, MapPin, Menu, UserRound, Wifi } from 'lucide-react';
+import { Building2, Check, ChevronDown, Clock, Lock, LogIn, LogOut, MapPin, Menu, UserRound, Wifi } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { APP_TITLE } from '@/lib/config';
-import { getTenant, setTenant, subscribeTenant, TENANT_OPTIONS, type TenantInfo } from '@/lib/tenant';
+import { DEFAULT_TENANT, getTenant, resolveTenant, setTenant, subscribeTenant, TENANT_OPTIONS, type TenantInfo } from '@/lib/tenant';
 import { useLinkHealth, type LinkHealth } from '@/lib/useLinkHealth';
 import { formatTime } from '@/lib/format';
 import { getStoredUser, persistUser, setCurrentUser, subscribeAuth } from '@/lib/auth';
@@ -49,6 +49,14 @@ export function TopBar({ onMenuOpen, menuButtonRef }: { onMenuOpen: () => void; 
     return subscribeAuth((u) => setUser(u));
   }, []);
 
+  // 受保护端点租户取 JWT tenantId：登录态下租户选择器应锁定为账号所属租户
+  useEffect(() => {
+    const stored = getStoredUser();
+    if (stored && getTenant().id !== stored.tenantId) {
+      setTenant(resolveTenant(stored.tenantId));
+    }
+  }, []);
+
   // 时钟
   useEffect(() => {
     setNow(new Date());
@@ -89,6 +97,7 @@ export function TopBar({ onMenuOpen, menuButtonRef }: { onMenuOpen: () => void; 
     setAccessToken(null);
     persistUser(null);
     setCurrentUser(null);
+    setTenant(DEFAULT_TENANT);
     router.replace('/login');
   };
 
@@ -112,52 +121,67 @@ export function TopBar({ onMenuOpen, menuButtonRef }: { onMenuOpen: () => void; 
         <p className="hidden truncate text-[11px] text-slate-400 sm:block">{active.description}</p>
       </div>
 
-      {/* 租户选择器 */}
-      <div ref={pickerRef} className="relative">
-        <button
-          type="button"
-          onClick={() => setPickerOpen((v) => !v)}
-          className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 text-left shadow-sm transition hover:border-brand-300 sm:px-3"
-          aria-expanded={pickerOpen}
-          aria-haspopup="listbox"
-          aria-label={`切换运营租户，当前：${tenant.name}`}
+      {/* 租户选择器：登录态锁定为账号所属租户（受保护端点租户取 JWT，切换会造成 403） */}
+      {user ? (
+        <div
+          className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-left shadow-sm"
+          title="当前账号已绑定所属租户；如需切换租户请退出登录后使用其他账号。"
         >
           <span className="grid h-6 w-6 place-items-center rounded-lg bg-brand-50 text-brand-600">
             <Building2 size={14} />
           </span>
-          <span className="hidden max-w-[240px] truncate text-xs font-semibold text-slate-700 xl:block">
+          <span className="hidden max-w-[220px] truncate text-xs font-semibold text-slate-600 xl:block">
             {tenant.name}
           </span>
-          <ChevronDown size={14} className={cn('text-slate-400 transition', pickerOpen && 'rotate-180')} />
-        </button>
+          <Lock size={12} className="shrink-0 text-slate-400" aria-label="租户已锁定" />
+        </div>
+      ) : (
+        <div ref={pickerRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setPickerOpen((v) => !v)}
+            className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 text-left shadow-sm transition hover:border-brand-300 sm:px-3"
+            aria-expanded={pickerOpen}
+            aria-haspopup="listbox"
+            aria-label={`切换运营租户，当前：${tenant.name}`}
+          >
+            <span className="grid h-6 w-6 place-items-center rounded-lg bg-brand-50 text-brand-600">
+              <Building2 size={14} />
+            </span>
+            <span className="hidden max-w-[240px] truncate text-xs font-semibold text-slate-700 xl:block">
+              {tenant.name}
+            </span>
+            <ChevronDown size={14} className={cn('text-slate-400 transition', pickerOpen && 'rotate-180')} />
+          </button>
 
-        {pickerOpen && (
-          <div role="listbox" aria-label="运营租户" className="absolute right-0 top-[calc(100%+8px)] w-[min(88vw,320px)] animate-fade-in rounded-2xl border border-slate-200 bg-white p-2 shadow-[var(--shadow-float)]">
-            <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">切换运营租户</p>
-            {TENANT_OPTIONS.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => chooseTenant(t)}
-                role="option"
-                aria-selected={t.id === tenant.id}
-                className="flex min-h-12 w-full items-start gap-2 rounded-xl px-3 py-2.5 text-left transition hover:bg-brand-50"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-                    <span className="truncate">{t.name}</span>
-                    {t.id === tenant.id && <Check size={13} className="shrink-0 text-brand-600" />}
+          {pickerOpen && (
+            <div role="listbox" aria-label="运营租户" className="absolute right-0 top-[calc(100%+8px)] w-[min(88vw,320px)] animate-fade-in rounded-2xl border border-slate-200 bg-white p-2 shadow-[var(--shadow-float)]">
+              <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">切换运营租户</p>
+              {TENANT_OPTIONS.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => chooseTenant(t)}
+                  role="option"
+                  aria-selected={t.id === tenant.id}
+                  className="flex min-h-12 w-full items-start gap-2 rounded-xl px-3 py-2.5 text-left transition hover:bg-brand-50"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                      <span className="truncate">{t.name}</span>
+                      {t.id === tenant.id && <Check size={13} className="shrink-0 text-brand-600" />}
+                    </span>
+                    <span className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-400">
+                      <MapPin size={10} />
+                      {t.region} · {t.id}
+                    </span>
                   </span>
-                  <span className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-400">
-                    <MapPin size={10} />
-                    {t.region} · {t.id}
-                  </span>
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 链路状态指示器 */}
       <div className="hidden h-10 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 md:flex">

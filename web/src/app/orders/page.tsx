@@ -93,7 +93,7 @@ export default function OrdersPage() {
   const [pageSize, setPageSize] = useState(10);
 
   // 概览/分布/待出库队列：最近 100 单快照（统计标签语义为「近 100 单」）
-  const { data: summaryData, refetch: refetchSummary } = useQuery({
+  const { data: summaryData } = useQuery({
     queryKey: ['orders', 'summary'],
     queryFn: () => listOrders({ page: 1, pageSize: SUMMARY_PAGE_SIZE }),
   });

@@ -1,6 +1,7 @@
 import axios, { type AxiosResponse } from 'axios';
 import { AI_BASE, API_BASE, AI_QA_TIMEOUT, AI_MARKETING_TIMEOUT, AI_STREAMING_ENABLED, GATEWAY_BASE } from './config';
 import { getTenant } from './tenant';
+import { persistUser, setCurrentUser } from './auth';
 import type {
   AgriQARequest,
   AgriQAResponse,
@@ -49,6 +50,31 @@ http.interceptors.request.use((config) => {
   const token = getAccessToken();
   if (token) config.headers.set('Authorization', `Bearer ${token}`);
   return config;
+});
+
+/**
+ * 401 兜底：B 端受保护端点返回 A1002（未登录/令牌失效）时清空本地会话并回登录页。
+ * 登录接口自身的 401（密码错误）与健康探针（validateStatus 全放行）不受影响。
+ */
+http.interceptors.response.use(undefined, (error) => {
+  const status = error?.response?.status as number | undefined;
+  const body = error?.response?.data as ApiResponse<unknown> | undefined;
+  const url = error?.config?.url as string | undefined;
+  if (
+    status === 401 &&
+    body?.code === 'A1002' &&
+    typeof url === 'string' &&
+    !url.includes('/auth/login') &&
+    typeof window !== 'undefined'
+  ) {
+    setAccessToken(null);
+    persistUser(null);
+    setCurrentUser(null);
+    if (!window.location.pathname.startsWith('/login')) {
+      window.location.assign('/login');
+    }
+  }
+  return Promise.reject(error);
 });
 
 /** 拆解统一包裹：code === '00000' 返回 data，否则抛业务错误 */

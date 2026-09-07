@@ -41,6 +41,11 @@ export function getTenant(): TenantInfo {
   return current;
 }
 
+/** 按租户 ID 解析展示信息；未知 ID 用 ID 本身兜底（如新种子租户）。 */
+export function resolveTenant(id: string): TenantInfo {
+  return TENANT_OPTIONS.find((t) => t.id === id) ?? { id, name: id, region: '' };
+}
+
 export function setTenant(tenant: TenantInfo): void {
   current = tenant;
   listeners.forEach((fn) => fn(tenant));

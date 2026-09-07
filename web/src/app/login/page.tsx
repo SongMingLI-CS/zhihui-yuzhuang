@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Loader2, LogIn, ShieldCheck, Wheat } from 'lucide-react';
 import { login, setAccessToken, toApiError } from '@/lib/http';
 import { persistUser, setCurrentUser } from '@/lib/auth';
+import { resolveTenant, setTenant } from '@/lib/tenant';
 import { APP_SHORT } from '@/lib/config';
 
 export default function LoginPage() {
@@ -24,6 +25,8 @@ export default function LoginPage() {
       setAccessToken(res.token);
       persistUser(res.user);
       setCurrentUser(res.user);
+      // 受保护端点租户取 JWT tenantId：登录后租户选择器应锁定为账号所属租户
+      setTenant(resolveTenant(res.user.tenantId));
       router.replace('/dashboard');
     } catch (err) {
       setError(toApiError(err).message);
