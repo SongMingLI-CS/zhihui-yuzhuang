@@ -466,6 +466,30 @@ paths:
                   data: null
 
   # ==========================================
+  # 经营大盘聚合 (Spring Boot · 只读 · 需 JWT)
+  # ==========================================
+  /dashboard/summary:
+    get:
+      summary: 经营大盘汇总（合计 + 近7日趋势 + 商品销量 TOP）
+      operationId: dashboardSummary
+      description: 需要 JWT（任意已认证角色）。数据范围限定为令牌 tenantId 所属租户；交易额口径 = 非 CANCELLED 订单金额合计（含待支付锁定 GMV）。
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 聚合快照
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/DashboardSummaryResponse'
+        '401':
+          $ref: '#/components/responses/StandardErrorResponse'
+
+  # ==========================================
   # 农技问答接口 (FastAPI + DeepSeek)
   # ==========================================
   /qa/ask:
@@ -1003,6 +1027,72 @@ components:
           format: int64
           description: 支付成功时间（epoch 毫秒）
           example: 1725437380000
+
+    # 经营大盘聚合响应模型
+    DashboardSummaryResponse:
+      type: object
+      required:
+        - tenantId
+        - totalOrders
+        - totalSales
+        - trend
+        - topProducts
+      properties:
+        tenantId:
+          type: string
+          example: "tenant_yuzhuang_001"
+        snapshotAt:
+          type: integer
+          format: int64
+          description: 快照时刻（epoch 毫秒）
+        totalOrders:
+          type: integer
+          description: 累计订单量（含已取消）
+        totalSales:
+          type: number
+          format: double
+          description: 累计交易额（非 CANCELLED，元）
+        todayOrders:
+          type: integer
+        todaySales:
+          type: number
+          format: double
+        pendingPayOrders:
+          type: integer
+          description: 待支付锁定订单量（超时自动关单回补）
+        readyShipOrders:
+          type: integer
+          description: 待出库订单量（履约 READY）
+        trend:
+          type: array
+          description: 近 7 日（含今日，升序，空日补零）
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              orderCount:
+                type: integer
+              salesAmount:
+                type: number
+                format: double
+        topProducts:
+          type: array
+          description: 商品销量 TOP（非 CANCELLED 订单明细）
+          items:
+            type: object
+            properties:
+              skuId:
+                type: integer
+                format: int64
+              spuName:
+                type: string
+              quantity:
+                type: integer
+              salesAmount:
+                type: number
+                format: double
 
   responses:
     StandardErrorResponse:

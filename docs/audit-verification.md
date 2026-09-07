@@ -14,8 +14,8 @@
 | 无 Flyway、schema.sql 初始化 | ✅ 属实 | 历史 `deploy/docker-compose.yml` 用 SPRING_SQL_INIT 每次启动执行 `db/schema.sql`+`seed-data.sql` | 阶段2-A 已闭环：Flyway（flyway-core/postgres 模块）+ V1 基线 + V2 支付列迁移 + baseline-on-migrate + compose 接入 |
 | H5 消费者闭环不完整 | ✅ 属实 | `h5/src/App.tsx` 仅浏览+下单+问答；`h5/src/lib/http.ts` 无订单查询 | 阶段3（待立项） |
 | 移动协同端为空 | ✅ 属实 | `mobile/` 仅 README | 阶段3+（待立项） |
-| 大屏=demo 数据 | ✅ 属实 | `web/src/app/dashboard/page.tsx` import `@/lib/demo` 并带演示徽标 | 阶段3：真实聚合 API（待立项） |
-| 知识库静态 | ✅ 属实 | `web/src/app/knowledge/page.tsx` 文档清单来自 demo | 阶段3（待立项） |
+| 大屏=demo 数据 | ✅ 属实（已修复） | 历史 `dashboard/page.tsx` 消费 `@/lib/demo`（METRICS/SALES_SHARE/buildTrend）并带演示徽标 | 阶段3 已闭环：`GET /dashboard/summary` 真实聚合 + web 60s 轮询切换；徽标改「实时经营数据」 |
+| 知识库静态 | ✅ 属实 | `web/src/app/knowledge/page.tsx` 文档清单来自 demo | 阶段3 续：知识库上传/解析后端（待立项） |
 | AI 审批无后端事实 | ✅ 属实 | `web/src/app/agents/page.tsx` approved 为本地 state，「模拟同步/模拟推送」仅前端 | 阶段3（待立项） |
 | 高并发叙事与实现偏差 | ✅ 属实 | `OrderServiceImpl`：checkout 为同步事务 CAS→落库→outbox，Redis Streams 仅事件投递 | 文档侧已纠正；后续立项：网关削峰/队列化 |
 | Outbox 多实例发布竞争 | ✅ 属实（存在缓解） | 历史 `OutboxSweeper.selectPendingBatch` 无 claim/lease，双实例可重复 XADD；消费端以 outbox `PROCESSED` 幂等回写 | 阶段3 已闭环：发布端租约认领（V3 列 + `claimById` 条件 UPDATE + lease 到期接管），失败/完成即清租约 |
@@ -73,7 +73,7 @@
 - 手动取消（MANUAL_CANCEL）接口与「开始拣货 PENDING→PICKING」入口待补（与 M 端协同联动）。
 - C 端下单仍以 header 表达店铺租户（无消费者身份）；未来接入登录/限流后收敛。
 - AI 端点无身份/限流治理；AI 评测缺门槛基线。
-- dashboard/knowledge demo 数据收敛（web 聚合端点）。
+- knowledge 知识库列表仍为 demo 静态数据（上传/解析后端待立项，dashboard 已切换真实聚合）。
 - 数据库迁移与生产部署动作需在部署环境执行（本机 Docker 5432/8080 被占用，无法本地跑 go-live）。
 
 ## 六、实现与验证状态
@@ -90,9 +90,12 @@
 | `baa20ff` | docs：api-spec 沙箱支付端点 + payment-closeout-design + 台账更新 |
 | `ca30d29` | backend（阶段3）：Outbox 发布端租约认领（V3 + claimById 条件 UPDATE + lease 接管 + 配置） |
 | `3d163ca` | backend tests：租约防重复/崩溃接管用例 → **96/96 绿** |
+| `b523f84` | backend（阶段3）：经营大盘真实聚合接口（合计/近7日/商品TOP，非 CANCELLED 口径） |
+| `b2ebb54` | backend tests：DashboardSummaryTest（口径/隔离/补零/端点契约）→ **99/99 绿** |
+| `f47de79` | web：dashboard 切真实经营聚合数据（60s 轮询，失败红标） |
 
 ### 6.2 验证命令与结果
-- `cd backend && mvn test`：全量 **Tests run 96, Failures 0, Errors 0**（H2 test profile，含支付/关单/outbox 租约用例）。
+- `cd backend && mvn test`：全量 **Tests run 99, Failures 0, Errors 0**（H2 test profile，含支付/关单/outbox 租约/dashboard 聚合用例）。
 - Flyway：container/dev 启动自动迁移；存量库 baseline-on-migrate；测试上下文 `spring.flyway.enabled=false` 保持 H2 自举。
 - `cd web && npm run typecheck`：通过；`npm run lint`：No warnings or errors。
 - h5 / ai-service：阶段1-2 未改其代码（仅 ai-service 模块内端口文档遗留，归其模块后续修正）。
@@ -101,7 +104,7 @@
 - 真实支付通道化与退款/对账（沙箱→真实 Adapter；设计见 payment-closeout-design.md）。
 - 手动取消接口、PENDING→PICKING 开始拣货入口（M 端协同联动）。
 - C 端下单仍以 header 表达店铺租户（匿名无身份，接入消费者登录后收敛）。
-- AI 端点治理与评测门槛、dashboard/knowledge demo 数据收敛、H5 订单中心（阶段3 续）。
+- AI 端点治理与评测门槛、knowledge demo 数据收敛与上传/解析、H5 订单中心（阶段3 续）。
 - 商品 `version` 列存在但未启用 `@Version` 全量 OCC；已有加载+作用域+条件更新兜底，完整 OCC 与后续优化一并推进。
 - ai-service 模块内 `DATABASE_URL`/文档的 5432 表述与宿主机 5433 对齐，留待 ai-service 模块维护时处理（避免越模块改动）。
 
