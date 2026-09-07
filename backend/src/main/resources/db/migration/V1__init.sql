@@ -1,4 +1,16 @@
 -- ============================================================
+-- Flyway V1 · PostgreSQL 领域表结构基线（下单交易 + 支付/关单闭环）
+--
+-- 说明：
+--  1. 本文件由 db/schema.sql 生成并作为 Flyway 基线 V1；同时被 compose 的
+--     SPRING_SQL_INIT_SCHEMA_LOCATIONS 引用，语句全部幂等（IF NOT EXISTS），
+--     先 init 后 Flyway（或反之）均安全（顺序无关兜底自举）。
+--  2. 存量库（无 flyway_schema_history）由 baseline-on-migrate 打基线 V1 后
+--     直接应用 V2+，历史表缺列由 V2__add_order_payment_closure_columns.sql 补齐。
+--  3. schema 演进：请新增 V{n}__*.sql，不要修改已发布的 V1（Flyway checksum 校验）。
+-- ============================================================
+
+-- ============================================================
 -- 智汇于庄 backend · PostgreSQL 领域表结构（下单交易闭环）
 --
 -- 设计说明：

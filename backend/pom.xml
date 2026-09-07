@@ -47,6 +47,16 @@
             <artifactId>spring-boot-starter-jdbc</artifactId>
         </dependency>
 
+        <!-- Flyway：版本化数据库迁移（基线 V1 对齐 db/migration，存量库 baseline-on-migrate） -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
+
         <!-- Redis（Redis Streams 可靠事件投递底座，Lettuce 客户端，不引入 Kafka 等重中间件） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

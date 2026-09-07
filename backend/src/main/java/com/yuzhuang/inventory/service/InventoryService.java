@@ -27,4 +27,15 @@ public interface InventoryService {
      * @param quantity 扣减数量（>0）
      */
     void deductStock(Long skuId, Integer quantity);
+
+    /**
+     * 库存回补（订单超时关单/取消后释放预留库存）。
+     *
+     * <p>调用方（关单服务）通过订单状态门（STOCK_CONFIRMED → CANCELLED 只能成功一次）
+     * 保证回补幂等；本方法仅做原子增量。
+     *
+     * @param skuId    SKU 主键
+     * @param quantity 回补数量（>0）
+     */
+    void restoreStock(Long skuId, Integer quantity);
 }

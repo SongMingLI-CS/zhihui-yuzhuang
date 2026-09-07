@@ -3,7 +3,7 @@
 --
 -- 触发方式：由 docker-compose 通过环境变量注入开启 SQL 初始化
 --   SPRING_SQL_INIT_MODE=always
---   SPRING_SQL_INIT_SCHEMA_LOCATIONS=classpath:db/schema.sql
+--   SPRING_SQL_INIT_SCHEMA_LOCATIONS=classpath:db/migration/V1__init.sql
 --   SPRING_SQL_INIT_DATA_LOCATIONS=classpath:db/seed-data.sql
 -- （仅容器启动时执行；不影响本地 H2 测试上下文。）
 --

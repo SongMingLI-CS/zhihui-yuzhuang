@@ -54,6 +54,21 @@ public class Order {
     /** 履约状态（出库流水维度） */
     private FulfillmentStatus fulfillmentStatus;
 
+    /** 支付渠道（沙箱 SANDBOX / 后续真实渠道适配） */
+    private String payChannel;
+
+    /** 渠道支付流水号（支付幂等去重键） */
+    private String payTradeNo;
+
+    /** 支付成功时间 */
+    private LocalDateTime paidAt;
+
+    /** 取消/超时关单时间 */
+    private LocalDateTime cancelledAt;
+
+    /** 关闭原因：PAY_TIMEOUT / MANUAL_CANCEL 等 */
+    private String closeReason;
+
     /** 收货人姓名 */
     private String recipientName;
 

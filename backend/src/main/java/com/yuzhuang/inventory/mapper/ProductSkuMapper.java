@@ -34,6 +34,18 @@ public interface ProductSkuMapper extends BaseMapper<ProductSku> {
     int decreaseStockCas(@Param("skuId") Long skuId, @Param("quantity") Integer quantity);
 
     /**
+     * 库存回补（幂等由调用方状态门（订单 CANCELLED 只能流转一次）保证）：
+     * 原子执行 {@code stock = stock + #{quantity}} 且 {@code version = version + 1}。
+     *
+     * @param skuId    SKU 主键
+     * @param quantity 回补数量（>0）
+     * @return 影响行数
+     */
+    @Update("UPDATE t_product_sku SET stock = stock + #{quantity}, version = version + 1 " +
+            "WHERE id = #{skuId}")
+    int restoreStock(@Param("skuId") Long skuId, @Param("quantity") Integer quantity);
+
+    /**
      * 按租户查询在售（ON_SALE）商品列表（特产读接口专用）。
      *
      * <p>过滤契约：

@@ -36,4 +36,10 @@ public class InventoryServiceImpl implements InventoryService {
             throw new BusinessException(ResultCode.INVENTORY_STOCK_OUT);
         }
     }
+
+    @Override
+    public void restoreStock(Long skuId, Integer quantity) {
+        // 幂等由调用方（超时关单的状态门）保证：只有 STOCK_CONFIRMED→CANCELLED 唯一一次成功才回补
+        productSkuMapper.restoreStock(skuId, quantity);
+    }
 }

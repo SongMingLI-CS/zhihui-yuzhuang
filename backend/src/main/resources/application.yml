@@ -41,6 +41,15 @@ spring:
   jackson:
     time-zone: Asia/Shanghai
 
+  # Flyway 版本化迁移：
+  #   - enabled=true 时容器/本地 PG 启动即按 db/migration 顺序执行（测试 H2 在 application-test.yml 关闭）；
+  #   - baseline-on-migrate 兼容历史无 flyway_schema_history 的存量库（打基线 V1，跳过 V1 重放，直接跑 V2+）。
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
+    locations: classpath:db/migration
+
 mybatis-plus:
   global-config:
     banner: false
@@ -69,6 +78,15 @@ yuzhuang:
     scan-interval-ms: ${OUTBOX_SCAN_INTERVAL_MS:2000}
     batch-size: ${OUTBOX_BATCH_SIZE:50}
     max-retry: ${OUTBOX_MAX_RETRY:5}
+
+  # 订单支付超时与超时关单（PAY_TIMEOUT 取消 + 幂等库存回补）
+  order:
+    payment-timeout-minutes: ${ORDER_PAYMENT_TIMEOUT_MINUTES:30}
+  order-close:
+    enabled: ${ORDER_CLOSE_ENABLED:true}
+    scan-interval-ms: ${ORDER_CLOSE_SCAN_INTERVAL_MS:60000}
+    initial-delay-ms: ${ORDER_CLOSE_INITIAL_DELAY_MS:15000}
+    batch-size: ${ORDER_CLOSE_BATCH_SIZE:50}
 
 logging:
   level:

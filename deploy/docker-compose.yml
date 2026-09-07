@@ -5,8 +5,8 @@
 #   postgres:5432  redis:6379  backend:8080  ai-service:8000
 # 宿主机映射：Postgres 5433（容器内 5432）/ Redis 6379 / Nginx 80。
 #
-# backend 的建表与种子数据（db/schema.sql + db/seed-data.sql）通过环境变量
-# SPRING_SQL_INIT_* 在【容器启动时】触发，幂等（ON CONFLICT DO NOTHING），
+# backend 的表结构由 Flyway 迁移管理（classpath:db/migration/V1__init.sql 基线 + V2 演进），
+# 种子数据（db/seed-data.sql）通过环境变量 SPRING_SQL_INIT_* 在【容器启动时】幂等触发（ON CONFLICT），
 # 不影响本地 H2 测试上下文。
 
 services:
@@ -82,9 +82,9 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-rural_password}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
-      # 容器启动自举：建表 + 幂等种子数据（仅本服务注入，不影响本地 H2 测试）
+      # 容器启动自举：Flyway 负责 schema（V1 基线幂等脚本亦在此作为兜底重放），种子数据幂等注入（仅本服务注入，不影响本地 H2 测试）
       SPRING_SQL_INIT_MODE: always
-      SPRING_SQL_INIT_SCHEMA_LOCATIONS: classpath:db/schema.sql
+      SPRING_SQL_INIT_SCHEMA_LOCATIONS: classpath:db/migration/V1__init.sql
       SPRING_SQL_INIT_DATA_LOCATIONS: classpath:db/seed-data.sql
       # Outbox -> Redis Streams 可靠投递开关（Redis 不可达时组件自动降级，不阻断启动）
       OUTBOX_ENABLED: "true"
