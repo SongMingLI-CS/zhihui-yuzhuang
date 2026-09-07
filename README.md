@@ -134,7 +134,7 @@ docker compose -f deploy/docker-compose.yml up -d
 
 | 服务 | 地址 | 说明 |
 |------|------|------|
-| PostgreSQL | `localhost:5432` | 库 `rural_revitalization` / 用户 `rural_user` / 密码 `rural_password` |
+| PostgreSQL | `localhost:5433`（容器内 5432） | 库 `rural_revitalization` / 用户 `rural_user` / 密码 `rural_password` |
 | Redis | `localhost:6379` | 含 AOF 持久化 |
 | Nginx 网关 | `localhost:80` | `/api` → 业务后端、`/ai` → AI 服务（待服务接入） |
 

@@ -1,0 +1,80 @@
+# 智汇于庄 · 项目完善度审查 事实核查与整改台账
+
+> 状态：阶段0+阶段1 整改执行中（认证强制化 + JWT↔租户绑定 + 商品写跨租户修复）
+> 核查基准：仓库 HEAD（`d125800`）。本文档为画布（Project Review Canvas）论断的**证据化对照表**，并记录本切片的设计决策与残留风险。
+
+## 一、画布论断核查对照
+
+| 画布论断 | 判定 | 证据（相对路径） | 整改动作 |
+|---|---|---|---|
+| JWT 匿名放行、写接口无角色校验 | ✅ 属实 | `backend/.../auth/filter/JwtAuthenticationFilter.java`：注释明示「不强制拦截」，无效令牌按匿名继续；全仓无 Spring Security/`@PreAuthorize`；`AuthContext` 生产代码零消费方 | 本切片：`AuthGuardInterceptor` 强制 + RBAC 矩阵 |
+| X-Tenant-Id 可伪造、未与 JWT 绑定 | ✅ 属实 | `backend/.../web/filter/TenantContextFilter.java` 直接信头；`AuthPrincipal.tenantId` 自 JWT 解析后从不参与鉴权 | 本切片：受保护端点租户唯一取 JWT `tenantId`，header 不再作为租户源 |
+| 商品更新/上下架存在跨租户面 | ✅ 属实 | `ProductAdminServiceImpl.updateProduct/updateStatus` 走 `selectById`+`updateById`，无租户/版本条件 | 本切片：service 增加租户形参与作用域校验（本租户 ∪ global/VILLAGE） |
+| 支付/关单/库存释放闭环缺失 | ✅ 属实（措辞纠偏：实际为**跳过支付直接 STOCK_CONFIRMED**，非停留在 PENDING_PAY） | `OrderServiceImpl` 下单即 STOCK_CONFIRMED；全仓无支付/关单 job/退款代码 | 阶段2：支付/关单/库存回补设计 + 实现（待立项） |
+| 无 Flyway、schema.sql 初始化 | ✅ 属实 | `deploy/docker-compose.yml` 用 SPRING_SQL_INIT 每次启动执行 `db/schema.sql`+`seed-data.sql` | 阶段2：Flyway 基线迁移（待立项） |
+| H5 消费者闭环不完整 | ✅ 属实 | `h5/src/App.tsx` 仅浏览+下单+问答；`h5/src/lib/http.ts` 无订单查询 | 阶段3（待立项） |
+| 移动协同端为空 | ✅ 属实 | `mobile/` 仅 README | 阶段3+（待立项） |
+| 大屏=demo 数据 | ✅ 属实 | `web/src/app/dashboard/page.tsx` import `@/lib/demo` 并带演示徽标 | 阶段3：真实聚合 API（待立项） |
+| 知识库静态 | ✅ 属实 | `web/src/app/knowledge/page.tsx` 文档清单来自 demo | 阶段3（待立项） |
+| AI 审批无后端事实 | ✅ 属实 | `web/src/app/agents/page.tsx` approved 为本地 state，「模拟同步/模拟推送」仅前端 | 阶段3（待立项） |
+| 高并发叙事与实现偏差 | ✅ 属实 | `OrderServiceImpl`：checkout 为同步事务 CAS→落库→outbox，Redis Streams 仅事件投递 | 文档侧已纠正；后续立项：网关削峰/队列化 |
+| Outbox 多实例发布竞争 | ✅ 属实（存在缓解） | `OutboxSweeper.selectPendingBatch` 无 SKIP LOCKED/claim；消费端以 outbox `PROCESSED` 幂等回写 | 阶段3：claim/lease + SKIP LOCKED（待立项） |
+| 端口/配置文档漂移 5432 vs 5433 | ✅ 属实 | compose 默认宿主映射 `5433→容器5432`，而 `README.md` 表格与根 `.env.example` 写作 5432；`ai-service` 默认 `DATABASE_URL` 也指向 5432 | 本切片 B0.3 修正根文档；ai-service 模块内文档归其模块后续修正 |
+| 其余 P1/P2（AI 评测门槛、AI 输入治理、缺压测、商品域简化、物流未建模等） | ✅ 与代码面一致 | 逐项均有对应缺口 | 待立项 |
+
+## 二、本切片设计决策（D1–D4）
+
+| # | 决策 | 方案 | 说明 |
+|---|---|---|---|
+| D1 | 认证实现 | 轻量 `HandlerInterceptor`（`AuthGuardInterceptor`）+ `AuthContext`，不引入 Spring Security | 与现有栈匹配、可单测；Spring Security 留待生产化评估 |
+| D2 | RBAC（最小化） | VILLAGE/COOPERATIVE 可写商品与履约；FARMER 仅本租户订单只读 | 不扩角色枚举、不引入 AOP |
+| D3 | 受保护端点租户来源 | 唯一取 JWT `tenantId`，`X-Tenant-Id` 头在受保护端点弃用 | header 仅保留给公开浏览/下单语义 |
+| D4 | 匿名边界 | allowlist 见 §三 | H5 免登录下单/浏览不受影响 |
+
+## 三、认证/授权矩阵（= B1 实现事实源）
+
+### 3.1 匿名公开（无需令牌）
+| 端点 | 方法 | 说明 |
+|---|---|---|
+| `/api/v1/auth/login` | POST | 换取 JWT |
+| `/api/v1/healthz` | GET | 健康探针 |
+| `/api/v1/products` | GET | 商品列表（本租户 ∪ global 在售） |
+| `/api/v1/products/{id}` | GET | 商品详情 |
+| `/api/v1/orders/checkout` | POST | C 端免登录下单（X-Tenant-Id=卖货店铺租户语义保留） |
+
+### 3.2 任意已认证（数据域=JWT tenantId）
+| 端点 | 方法 |
+|---|---|
+| `/api/v1/orders` | GET |
+| `/api/v1/orders/{orderNo}` | GET |
+
+### 3.3 COOPERATIVE / VILLAGE（数据域=JWT tenantId）
+| 端点 | 方法 |
+|---|---|
+| `/api/v1/products` | POST |
+| `/api/v1/products/{id}` | PUT |
+| `/api/v1/products/{id}/status` | PATCH |
+| `/api/v1/orders/{orderNo}/ship` `/mark-ready` `/recover` | POST |
+
+### 3.4 商品写作用域规则
+- 目标商品 `tenant_id` 必须 = 令牌 `tenantId`；跨租户一律映射 **404 + A1004**（避免暴露资源存在性）。
+- `global`（共享目录）仅 **VILLAGE（村委/运营）** 可维护；COOPERATIVE/FARMER 无此权限。
+
+## 四、契约改动（api-spec 同步项）
+1. 受保护端点新增 `security: [{BearerAuth: []}]` 标注。
+2. `/orders` 系列与 `/products` 写的 `X-Tenant-Id` 参数**移除**（改由 JWT tenantId 提供）。
+3. `/orders/checkout`、`GET /products` 保留 `X-Tenant-Id`（公开语义）。
+4. 错误面：未认证 → **401 + A1002**；无权限 → **403 + A1003**；跨租户/不存在 → **404 + A1004**（复用既有 ResultCode，无新增码）。
+
+## 五、残留风险（本切片范围外，需后续立项）
+- 支付/关单/库存补偿闭环未实现（阶段2）。
+- C 端下单仍以 header 表达店铺租户（无消费者身份）；未来接入登录/限流后收敛。
+- Outbox 发布竞争窗口未关闭（阶段3）。
+- Flyway 尚未引入（阶段2）。
+- AI 端点无身份/限流治理；AI 评测缺门槛基线。
+- 数据库迁移与生产部署动作需在部署环境执行（本机 Docker 5432/8080 被占用，无法本地跑 go-live）。
+
+## 六、验证状态
+- backend `mvn -q test`（H2 test profile）：阶段1完成后全绿（基线 31 + 新增对抗/回归用例）。
+- web：`npx tsc --noEmit` 通过。
+- 提交粒度：docs → backend(安全切片) → backend(tests) → web，按模块隔离。

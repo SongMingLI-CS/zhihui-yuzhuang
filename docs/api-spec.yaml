@@ -54,14 +54,9 @@ paths:
     post:
       summary: 上架新商品
       operationId: createProduct
-      parameters:
-        - in: header
-          name: X-Tenant-Id
-          required: false
-          schema:
-            type: string
-            default: "global"
-          description: 多租户标识（缺省 global）
+      description: 需要 JWT；商品归属租户取令牌 tenantId（COOPERATIVE/VILLAGE 可写；global 目录仅 VILLAGE 可维护）。
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -86,6 +81,9 @@ paths:
     put:
       summary: 编辑商品
       operationId: updateProduct
+      description: 需要 JWT；仅可编辑本租户商品（跨租户返回 404 + A1004；global 目录仅 VILLAGE 可维护）。
+      security:
+        - BearerAuth: []
       parameters:
         - in: path
           name: id
@@ -117,6 +115,9 @@ paths:
     patch:
       summary: 商品上下架切换
       operationId: updateProductStatus
+      description: 需要 JWT；仅可操作本租户商品（跨租户返回 404 + A1004）。
+      security:
+        - BearerAuth: []
       parameters:
         - in: path
           name: id
@@ -151,6 +152,7 @@ paths:
     post:
       summary: 特产商品下单（支持并发削峰与幂等保障）
       operationId: createSpecialtyOrder
+      description: 公开匿名下单；X-Tenant-Id 表示卖货店铺/合作社租户，X-Idempotency-Key 防重复提交。
       parameters:
         - in: header
           name: X-Tenant-Id
@@ -205,14 +207,10 @@ paths:
     get:
       summary: 分页查询当前租户订单列表
       operationId: listOrders
+      description: 需要 JWT；数据范围限定为令牌 tenantId 所属租户（任意已认证角色可读）。
+      security:
+        - BearerAuth: []
       parameters:
-        - in: header
-          name: X-Tenant-Id
-          required: false
-          schema:
-            type: string
-            default: "global"
-          description: 多租户标识（缺省 global）
         - in: query
           name: page
           required: false
@@ -276,14 +274,10 @@ paths:
     get:
       summary: 查询订单详情（含明细行）
       operationId: getOrderDetail
+      description: 需要 JWT；数据范围限定为令牌 tenantId 所属租户，跨租户返回 404 + A1004。
+      security:
+        - BearerAuth: []
       parameters:
-        - in: header
-          name: X-Tenant-Id
-          required: false
-          schema:
-            type: string
-            default: "global"
-          description: 多租户标识（缺省 global）
         - in: path
           name: orderNo
           required: true
@@ -308,14 +302,10 @@ paths:
     post:
       summary: 订单一键出库（履约状态 READY → SHIPPED）
       operationId: shipOrder
+      description: 需要 JWT；数据范围限定为令牌 tenantId 所属租户（COOPERATIVE/VILLAGE 可操作）。
+      security:
+        - BearerAuth: []
       parameters:
-        - in: header
-          name: X-Tenant-Id
-          required: false
-          schema:
-            type: string
-            default: "global"
-          description: 多租户标识（缺省 global）
         - in: path
           name: orderNo
           required: true
@@ -352,14 +342,10 @@ paths:
     post:
       summary: 拣货完成置为待出库（履约状态 PICKING → READY）
       operationId: markOrderReady
+      description: 需要 JWT；数据范围限定为令牌 tenantId 所属租户（COOPERATIVE/VILLAGE 可操作）。
+      security:
+        - BearerAuth: []
       parameters:
-        - in: header
-          name: X-Tenant-Id
-          required: false
-          schema:
-            type: string
-            default: "global"
-          description: 多租户标识（缺省 global）
         - in: path
           name: orderNo
           required: true
@@ -396,14 +382,10 @@ paths:
     post:
       summary: 异常单恢复拣货（履约状态 ABNORMAL → PICKING）
       operationId: recoverAbnormalOrder
+      description: 需要 JWT；数据范围限定为令牌 tenantId 所属租户（COOPERATIVE/VILLAGE 可操作）。
+      security:
+        - BearerAuth: []
       parameters:
-        - in: header
-          name: X-Tenant-Id
-          required: false
-          schema:
-            type: string
-            default: "global"
-          description: 多租户标识（缺省 global）
         - in: path
           name: orderNo
           required: true
