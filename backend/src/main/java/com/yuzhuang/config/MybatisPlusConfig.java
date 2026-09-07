@@ -15,7 +15,8 @@ import org.springframework.context.annotation.Configuration;
         "com.yuzhuang.inventory.mapper",
         "com.yuzhuang.outbox.mapper",
         "com.yuzhuang.auth.mapper",
-        "com.yuzhuang.tenant.mapper"
+        "com.yuzhuang.tenant.mapper",
+        "com.yuzhuang.dashboard.mapper"
 })
 public class MybatisPlusConfig {
 }
