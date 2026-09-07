@@ -419,6 +419,53 @@ paths:
                   requestId: "req-err-004"
 
   # ==========================================
+  # 支付闭环（演示沙箱 · 订单支付成功入账）
+  # ==========================================
+  /orders/{orderNo}/pay/sandbox:
+    post:
+      summary: 模拟支付成功（沙箱演示）
+      operationId: sandboxPayOrder
+      description: 需要 JWT（COOPERATIVE/VILLAGE）。将 STOCK_CONFIRMED → PROCESSING 并记录渠道流水号（幂等去重）：同渠道同流水号重复回放幂等成功，异流水号重复支付 409 + B2003；已关闭订单 404。
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: orderNo
+          required: true
+          schema:
+            type: string
+          description: 业务订单号
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentSandboxPayRequest'
+      responses:
+        '200':
+          description: 支付成功入账（status=PROCESSING）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/PaymentSandboxResponse'
+        '404':
+          $ref: '#/components/responses/StandardErrorResponse'
+        '409':
+          description: 重复支付或当前状态不允许支付
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+                example:
+                  code: "B2003"
+                  message: "订单已支付，重复支付被拒绝"
+                  data: null
+
+  # ==========================================
   # 农技问答接口 (FastAPI + DeepSeek)
   # ==========================================
   /qa/ask:
@@ -912,6 +959,50 @@ components:
                 type: number
                 format: float
                 example: 0.892
+
+    # 支付沙箱请求模型
+    PaymentSandboxPayRequest:
+      type: object
+      required:
+        - channel
+        - tradeNo
+      properties:
+        channel:
+          type: string
+          enum: [SANDBOX]
+          example: "SANDBOX"
+        tradeNo:
+          type: string
+          maxLength: 64
+          description: 渠道支付流水号（幂等去重键）
+          example: "pay_trade_1725437380"
+
+    # 支付沙箱响应模型
+    PaymentSandboxResponse:
+      type: object
+      required:
+        - orderNo
+        - status
+        - paidAt
+      properties:
+        orderNo:
+          type: string
+          example: "ORD202609040001"
+        status:
+          type: string
+          enum: [PROCESSING]
+          example: "PROCESSING"
+        channel:
+          type: string
+          example: "SANDBOX"
+        tradeNo:
+          type: string
+          example: "pay_trade_1725437380"
+        paidAt:
+          type: integer
+          format: int64
+          description: 支付成功时间（epoch 毫秒）
+          example: 1725437380000
 
   responses:
     StandardErrorResponse:

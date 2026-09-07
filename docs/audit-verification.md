@@ -10,8 +10,8 @@
 | JWT 匿名放行、写接口无角色校验 | ✅ 属实 | `backend/.../auth/filter/JwtAuthenticationFilter.java`：注释明示「不强制拦截」，无效令牌按匿名继续；全仓无 Spring Security/`@PreAuthorize`；`AuthContext` 生产代码零消费方 | 本切片：`AuthGuardInterceptor` 强制 + RBAC 矩阵 |
 | X-Tenant-Id 可伪造、未与 JWT 绑定 | ✅ 属实 | `backend/.../web/filter/TenantContextFilter.java` 直接信头；`AuthPrincipal.tenantId` 自 JWT 解析后从不参与鉴权 | 本切片：受保护端点租户唯一取 JWT `tenantId`，header 不再作为租户源 |
 | 商品更新/上下架存在跨租户面 | ✅ 属实 | `ProductAdminServiceImpl.updateProduct/updateStatus` 走 `selectById`+`updateById`，无租户/版本条件 | 本切片：service 增加租户形参与作用域校验（本租户 ∪ global/VILLAGE） |
-| 支付/关单/库存释放闭环缺失 | ✅ 属实（措辞纠偏：实际为**跳过支付直接 STOCK_CONFIRMED**，非停留在 PENDING_PAY） | `OrderServiceImpl` 下单即 STOCK_CONFIRMED；全仓无支付/关单 job/退款代码 | 阶段2：支付/关单/库存回补设计 + 实现（待立项） |
-| 无 Flyway、schema.sql 初始化 | ✅ 属实 | `deploy/docker-compose.yml` 用 SPRING_SQL_INIT 每次启动执行 `db/schema.sql`+`seed-data.sql` | 阶段2：Flyway 基线迁移（待立项） |
+| 支付/关单/库存释放闭环缺失 | ✅ 属实（措辞纠偏：实际为**跳过支付直接 STOCK_CONFIRMED**，非停留在 PENDING_PAY） | `OrderServiceImpl` 下单即 STOCK_CONFIRMED；历史无支付/关单 job/退款代码 | 阶段2-B 已闭环：沙箱支付（STOCK_CONFIRMED→PROCESSING）+ 超时关单 + 幂等库存回补；真实通道待接入 |
+| 无 Flyway、schema.sql 初始化 | ✅ 属实 | 历史 `deploy/docker-compose.yml` 用 SPRING_SQL_INIT 每次启动执行 `db/schema.sql`+`seed-data.sql` | 阶段2-A 已闭环：Flyway（flyway-core/postgres 模块）+ V1 基线 + V2 支付列迁移 + baseline-on-migrate + compose 接入 |
 | H5 消费者闭环不完整 | ✅ 属实 | `h5/src/App.tsx` 仅浏览+下单+问答；`h5/src/lib/http.ts` 无订单查询 | 阶段3（待立项） |
 | 移动协同端为空 | ✅ 属实 | `mobile/` 仅 README | 阶段3+（待立项） |
 | 大屏=demo 数据 | ✅ 属实 | `web/src/app/dashboard/page.tsx` import `@/lib/demo` 并带演示徽标 | 阶段3：真实聚合 API（待立项） |
@@ -55,6 +55,7 @@
 | `/api/v1/products/{id}` | PUT |
 | `/api/v1/products/{id}/status` | PATCH |
 | `/api/v1/orders/{orderNo}/ship` `/mark-ready` `/recover` | POST |
+| `/api/v1/orders/{orderNo}/pay/sandbox`（沙箱支付演示） | POST |
 
 ### 3.4 商品写作用域规则
 - 目标商品 `tenant_id` 必须 = 令牌 `tenantId`；跨租户一律映射 **404 + A1004**（避免暴露资源存在性）。
@@ -65,12 +66,13 @@
 2. `/orders` 系列与 `/products` 写的 `X-Tenant-Id` 参数**移除**（改由 JWT tenantId 提供）。
 3. `/orders/checkout`、`GET /products` 保留 `X-Tenant-Id`（公开语义）。
 4. 错误面：未认证 → **401 + A1002**；无权限 → **403 + A1003**；跨租户/不存在 → **404 + A1004**（复用既有 ResultCode，无新增码）。
+5. 阶段2 新增沙箱支付端点 `/orders/{orderNo}/pay/sandbox`（COOPERATIVE/VILLAGE，STOCK_CONFIRMED→PROCESSING）；`t_order` 支付/关单列由 Flyway V1（全新建库）/V2（存量库补齐）管理。
 
 ## 五、残留风险（本切片范围外，需后续立项）
-- 支付/关单/库存补偿闭环未实现（阶段2）。
+- 真实支付通道化：验签/回调/退款/对账/金额二次校验、沙箱→真实渠道 Adapter（设计见 `docs/payment-closeout-design.md`）。
+- 手动取消（MANUAL_CANCEL）接口与「开始拣货 PENDING→PICKING」入口待补（与 M 端协同联动）。
 - C 端下单仍以 header 表达店铺租户（无消费者身份）；未来接入登录/限流后收敛。
-- Outbox 发布竞争窗口未关闭（阶段3）。
-- Flyway 尚未引入（阶段2）。
+- Outbox 发布竞争窗口未关闭（阶段3：claim/lease + SKIP LOCKED）。
 - AI 端点无身份/限流治理；AI 评测缺门槛基线。
 - 数据库迁移与生产部署动作需在部署环境执行（本机 Docker 5432/8080 被占用，无法本地跑 go-live）。
 
@@ -83,17 +85,21 @@
 | `46d38ae` | backend：`AuthGuardInterceptor` + `AuthContext.require()` + JWT 租户绑定 + 商品写跨租户修复（含 global 目录 VILLAGE 规则） |
 | `079e308` | backend tests：WebContractTest/ProductAdminTest/OrderQuery/Fulfillment 对抗与回归；全量 **86/86 绿**（H2 test profile） |
 | `ab5cc11` | web：登录租户锁定 + 顶栏选择器登录态禁用 + 401 自动回登录 + lint 修复 |
+| `待提交（阶段2-A）` | backend：Flyway 依赖/配置/关闭（test H2 关闭）+ V1 基线 + V2 支付列迁移 + compose/seed 接入 |
+| `待提交（阶段2-B）` | backend：支付沙箱 + 超时关单调度 + 幂等库存回补 + 相关测试（94/94 绿） |
+| `待提交（docs2）` | docs：api-spec 沙箱支付端点 + payment-closeout-design + 台账更新 |
 
 ### 6.2 验证命令与结果
-- `cd backend && mvn test`：全量 **Tests run 86, Failures 0, Errors 0**（H2 test profile，含新增对抗/回归/契约用例）。
-- `cd web && npm run typecheck`：通过；`npm run lint`：No warnings or errors；`npm run test`：2/2 通过。
-- h5 / ai-service：本切片未改其代码（仅 ai-service 模块内端口文档遗留，归其模块后续修正）。
+- `cd backend && mvn test`：全量 **Tests run 94, Failures 0, Errors 0**（H2 test profile，含支付/关单对抗用例）。
+- Flyway：container/dev 启动自动迁移；存量库 baseline-on-migrate；测试上下文 `spring.flyway.enabled=false` 保持 H2 自举。
+- `cd web && npm run typecheck`：通过；`npm run lint`：No warnings or errors。
+- h5 / ai-service：阶段1-2 未改其代码（仅 ai-service 模块内端口文档遗留，归其模块后续修正）。
 
 ### 6.3 残留风险（后续立项跟踪）
-- 支付/关单/库存补偿闭环（阶段2）。
-- Flyway 基线迁移（阶段2）。
+- 真实支付通道化与退款/对账（沙箱→真实 Adapter；设计见 payment-closeout-design.md）。
+- 手动取消接口、PENDING→PICKING 开始拣货入口（M 端协同联动）。
 - C 端下单仍以 header 表达店铺租户（匿名无身份，接入消费者登录后收敛）。
 - Outbox claim/SKIP LOCKED、AI 端点治理与评测门槛、dashboard/knowledge demo 数据收敛（阶段3）。
-- 商品 `version` 列已存在但未启用乐观锁（`@Version`），本切片用「加载+作用域校验+条件更新」兜底；完整 OCC 与 Flyway 一并推进。
+- 商品 `version` 列存在但未启用 `@Version` 全量 OCC；已有加载+作用域+条件更新兜底，完整 OCC 与后续优化一并推进。
 - ai-service 模块内 `DATABASE_URL`/文档的 5432 表述与宿主机 5433 对齐，留待 ai-service 模块维护时处理（避免越模块改动）。
 
