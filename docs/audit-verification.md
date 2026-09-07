@@ -93,6 +93,7 @@
 | `b523f84` | backend（阶段3）：经营大盘真实聚合接口（合计/近7日/商品TOP，非 CANCELLED 口径） |
 | `b2ebb54` | backend tests：DashboardSummaryTest（口径/隔离/补零/端点契约）→ **99/99 绿** |
 | `f47de79` | web：dashboard 切真实经营聚合数据（60s 轮询，失败红标） |
+| `1ceb6d4` | docs：api-spec `/dashboard/summary` 契约 + 台账更新 |
 
 ### 6.2 验证命令与结果
 - `cd backend && mvn test`：全量 **Tests run 99, Failures 0, Errors 0**（H2 test profile，含支付/关单/outbox 租约/dashboard 聚合用例）。
