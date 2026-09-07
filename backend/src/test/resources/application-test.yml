@@ -22,11 +22,18 @@ spring:
       mode: always
       schema-locations: classpath:schema-test.sql
 
+  # 测试上下文用 H2 自举 schema，关闭 Flyway 以避免 PostgreSQL 迁移方言在 H2 上冲突
+  flyway:
+    enabled: false
+
 # 测试环境关闭 Outbox → Redis Streams 后台链路（定时 Sweeper / 消费者 / Stream 监听容器），
 # 避免无 Redis 依赖的 @SpringBootTest 在启动时建立连接；该异步链路由
 # OutboxRedisStreamIntegrationTest 以 Mockito 隔离方式验证发布/消费/状态闭环。
 yuzhuang:
   outbox:
+    enabled: false
+  # 关闭超时关单定时任务（服务层仍可被测试直接调用）
+  order-close:
     enabled: false
 
 mybatis-plus:
