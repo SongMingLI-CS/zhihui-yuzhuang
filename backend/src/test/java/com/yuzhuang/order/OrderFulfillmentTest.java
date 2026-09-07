@@ -13,6 +13,7 @@ import com.yuzhuang.order.enums.OrderStatus;
 import com.yuzhuang.order.mapper.OrderItemMapper;
 import com.yuzhuang.order.mapper.OrderMapper;
 import com.yuzhuang.order.service.OrderFulfillmentService;
+import com.yuzhuang.test.WebAuthTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,7 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-class OrderFulfillmentTest {
+class OrderFulfillmentTest extends WebAuthTestSupport {
 
     private static final String TENANT_A = "tenant_yuzhuang_001";
     private static final String TENANT_B = "tenant_yuzhuang_002";
@@ -69,7 +70,7 @@ class OrderFulfillmentTest {
         seedOrder(TENANT_A, "ORD-SHP-1", "STOCK_CONFIRMED", "READY", "H5_PRIVATE");
 
         mockMvc.perform(post("/api/v1/orders/ORD-SHP-1/ship")
-                        .header(HeaderNames.X_TENANT_ID, TENANT_A))
+                        .header(HeaderNames.AUTHORIZATION, bearer("VILLAGE", TENANT_A)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("00000"))
                 .andExpect(jsonPath("$.data.orderNo").value("ORD-SHP-1"))
@@ -89,7 +90,7 @@ class OrderFulfillmentTest {
         seedOrder(TENANT_A, "ORD-SHP-2", "PROCESSING", "PICKING", "DOUYIN");
 
         mockMvc.perform(post("/api/v1/orders/ORD-SHP-2/ship")
-                        .header(HeaderNames.X_TENANT_ID, TENANT_A))
+                        .header(HeaderNames.AUTHORIZATION, bearer("VILLAGE", TENANT_A)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("B2003"));
 
@@ -102,7 +103,7 @@ class OrderFulfillmentTest {
     @Test
     void ship_missingOrder_returns404A1004() throws Exception {
         mockMvc.perform(post("/api/v1/orders/ORD-NO-SUCH/ship")
-                        .header(HeaderNames.X_TENANT_ID, TENANT_A))
+                        .header(HeaderNames.AUTHORIZATION, bearer("VILLAGE", TENANT_A)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("A1004"));
     }
@@ -112,7 +113,7 @@ class OrderFulfillmentTest {
         seedOrder(TENANT_A, "ORD-SHP-3", "STOCK_CONFIRMED", "READY", "H5_PRIVATE");
 
         mockMvc.perform(post("/api/v1/orders/ORD-SHP-3/ship")
-                        .header(HeaderNames.X_TENANT_ID, TENANT_B))
+                        .header(HeaderNames.AUTHORIZATION, bearer("VILLAGE", TENANT_B)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("A1004"));
 
@@ -127,10 +128,10 @@ class OrderFulfillmentTest {
         seedOrder(TENANT_A, "ORD-SHP-4", "STOCK_CONFIRMED", "READY", "H5_PRIVATE");
 
         mockMvc.perform(post("/api/v1/orders/ORD-SHP-4/ship")
-                        .header(HeaderNames.X_TENANT_ID, TENANT_A))
+                        .header(HeaderNames.AUTHORIZATION, bearer("VILLAGE", TENANT_A)))
                 .andExpect(status().isOk());
         mockMvc.perform(post("/api/v1/orders/ORD-SHP-4/ship")
-                        .header(HeaderNames.X_TENANT_ID, TENANT_A))
+                        .header(HeaderNames.AUTHORIZATION, bearer("VILLAGE", TENANT_A)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("B2003"));
     }
@@ -183,7 +184,7 @@ class OrderFulfillmentTest {
         seedOrder(TENANT_A, "ORD-FILT-3", "PROCESSING", "PICKING", "KUAISHOU");
 
         mockMvc.perform(get("/api/v1/orders")
-                        .header(HeaderNames.X_TENANT_ID, TENANT_A)
+                        .header(HeaderNames.AUTHORIZATION, bearer("VILLAGE", TENANT_A))
                         .param("fulfillmentStatus", "READY"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("00000"))
@@ -195,7 +196,7 @@ class OrderFulfillmentTest {
     @Test
     void list_invalidFulfillmentStatus_returns400A1001() throws Exception {
         mockMvc.perform(get("/api/v1/orders")
-                        .header(HeaderNames.X_TENANT_ID, TENANT_A)
+                        .header(HeaderNames.AUTHORIZATION, bearer("VILLAGE", TENANT_A))
                         .param("fulfillmentStatus", "NOT_A_FULFILLMENT_STATE"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("A1001"));
@@ -206,7 +207,7 @@ class OrderFulfillmentTest {
         seedOrder(TENANT_A, "ORD-MR-1", "PROCESSING", "PICKING", "DOUYIN");
 
         mockMvc.perform(post("/api/v1/orders/ORD-MR-1/mark-ready")
-                        .header(HeaderNames.X_TENANT_ID, TENANT_A))
+                        .header(HeaderNames.AUTHORIZATION, bearer("VILLAGE", TENANT_A)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("00000"))
                 .andExpect(jsonPath("$.data.fulfillmentStatus").value("READY"));
@@ -222,7 +223,7 @@ class OrderFulfillmentTest {
         seedOrder(TENANT_A, "ORD-MR-2", "STOCK_CONFIRMED", "READY", "H5_PRIVATE");
 
         mockMvc.perform(post("/api/v1/orders/ORD-MR-2/mark-ready")
-                        .header(HeaderNames.X_TENANT_ID, TENANT_A))
+                        .header(HeaderNames.AUTHORIZATION, bearer("VILLAGE", TENANT_A)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("B2003"));
     }
@@ -232,7 +233,7 @@ class OrderFulfillmentTest {
         seedOrder(TENANT_A, "ORD-RC-1", "PROCESSING", "ABNORMAL", "KUAISHOU");
 
         mockMvc.perform(post("/api/v1/orders/ORD-RC-1/recover")
-                        .header(HeaderNames.X_TENANT_ID, TENANT_A))
+                        .header(HeaderNames.AUTHORIZATION, bearer("VILLAGE", TENANT_A)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("00000"))
                 .andExpect(jsonPath("$.data.fulfillmentStatus").value("PICKING"));
@@ -248,7 +249,7 @@ class OrderFulfillmentTest {
         seedOrder(TENANT_A, "ORD-RC-2", "PROCESSING", "PICKING", "DOUYIN");
 
         mockMvc.perform(post("/api/v1/orders/ORD-RC-2/recover")
-                        .header(HeaderNames.X_TENANT_ID, TENANT_A))
+                        .header(HeaderNames.AUTHORIZATION, bearer("VILLAGE", TENANT_A)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("B2003"));
     }
@@ -259,7 +260,7 @@ class OrderFulfillmentTest {
         seedOrder(TENANT_A, "ORD-KW-2", "PROCESSING", "SHIPPED", "DOUYIN");
 
         mockMvc.perform(get("/api/v1/orders")
-                        .header(HeaderNames.X_TENANT_ID, TENANT_A)
+                        .header(HeaderNames.AUTHORIZATION, bearer("VILLAGE", TENANT_A))
                         .param("keyword", "ORD-KW-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(1))

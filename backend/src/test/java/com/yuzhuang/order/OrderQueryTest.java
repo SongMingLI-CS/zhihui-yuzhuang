@@ -14,6 +14,7 @@ import com.yuzhuang.order.enums.OrderStatus;
 import com.yuzhuang.order.mapper.OrderItemMapper;
 import com.yuzhuang.order.mapper.OrderMapper;
 import com.yuzhuang.order.service.OrderQueryService;
+import com.yuzhuang.test.WebAuthTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-class OrderQueryTest {
+class OrderQueryTest extends WebAuthTestSupport {
 
     private static final String GLOBAL = "global";
     private static final String TENANT_A = "tenant_yuzhuang_001";
@@ -145,7 +146,7 @@ class OrderQueryTest {
         seedOrder(TENANT_A, "ORD-H-2", "PROCESSING", "H5_PRIVATE", LocalDateTime.now());
 
         mockMvc.perform(get("/api/v1/orders")
-                        .header(HeaderNames.X_TENANT_ID, TENANT_A)
+                        .header(HeaderNames.AUTHORIZATION, bearer("VILLAGE", TENANT_A))
                         .param("page", "1").param("pageSize", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("00000"))
@@ -159,7 +160,7 @@ class OrderQueryTest {
         seedOrder(TENANT_A, "ORD-HD-1", "STOCK_CONFIRMED", "H5_PRIVATE", LocalDateTime.now());
         seedItem("ORD-HD-1", 1001L, 2, "45.00");
 
-        mockMvc.perform(get("/api/v1/orders/ORD-HD-1").header(HeaderNames.X_TENANT_ID, TENANT_A))
+        mockMvc.perform(get("/api/v1/orders/ORD-HD-1").header(HeaderNames.AUTHORIZATION, bearer("VILLAGE", TENANT_A)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("00000"))
                 .andExpect(jsonPath("$.data.orderNo").value("ORD-HD-1"))
@@ -168,7 +169,7 @@ class OrderQueryTest {
 
     @Test
     void detailEndpoint_notFound_returns404A1004() throws Exception {
-        mockMvc.perform(get("/api/v1/orders/ORD-NONE").header(HeaderNames.X_TENANT_ID, TENANT_A))
+        mockMvc.perform(get("/api/v1/orders/ORD-NONE").header(HeaderNames.AUTHORIZATION, bearer("VILLAGE", TENANT_A)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(ResultCode.NOT_FOUND.getCode()));
     }
@@ -176,7 +177,7 @@ class OrderQueryTest {
     @Test
     void listEndpoint_invalidStatus_returns400A1001() throws Exception {
         mockMvc.perform(get("/api/v1/orders")
-                        .header(HeaderNames.X_TENANT_ID, TENANT_A)
+                        .header(HeaderNames.AUTHORIZATION, bearer("VILLAGE", TENANT_A))
                         .param("status", "NOT_A_STATUS"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("A1001"));

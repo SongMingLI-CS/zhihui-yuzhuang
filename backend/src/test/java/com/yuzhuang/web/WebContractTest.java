@@ -5,6 +5,7 @@ import com.yuzhuang.common.constant.HeaderNames;
 import com.yuzhuang.common.context.TenantContext;
 import com.yuzhuang.common.enums.ResultCode;
 import com.yuzhuang.common.exception.BusinessException;
+import com.yuzhuang.test.WebAuthTestSupport;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
@@ -38,7 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-class WebContractTest {
+class WebContractTest extends WebAuthTestSupport {
 
     @Autowired
     private MockMvc mockMvc;
@@ -97,6 +98,59 @@ class WebContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("00000"))
                 .andExpect(jsonPath("$.data").value("global"));
+    }
+
+    // ============================================================
+    // 安全强化契约：认证/授权强制（401 A1002 / 403 A1003）+ 公开白名单
+    // ============================================================
+
+    @Test
+    void protectedRead_withoutToken_returns401A1002() throws Exception {
+        mockMvc.perform(get("/api/v1/orders"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("A1002"));
+    }
+
+    @Test
+    void protectedWrite_withoutToken_returns401A1002() throws Exception {
+        mockMvc.perform(post("/api/v1/products")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"skuCode\":\"SKU-NO-AUTH\",\"spuName\":\"未授权商品\",\"price\":10.0,\"stock\":1,\"status\":\"ON_SALE\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("A1002"));
+    }
+
+    @Test
+    void protectedRead_invalidToken_returns401A1002() throws Exception {
+        mockMvc.perform(get("/api/v1/orders").header(HeaderNames.AUTHORIZATION, "Bearer invalid.token.here"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("A1002"));
+    }
+
+    @Test
+    void farmerCanReadOwnTenantOrders_butCannotShip() throws Exception {
+        // 只读放行（任意已认证角色）→ 200 00000（数据域=令牌 tenantId，行数不在此断言）
+        mockMvc.perform(get("/api/v1/orders").header(HeaderNames.AUTHORIZATION, farmerBearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("00000"));
+
+        // 履约写需 COOPERATIVE/VILLAGE → 403 A1003
+        mockMvc.perform(post("/api/v1/orders/ORD-NO-SUCH/ship")
+                        .header(HeaderNames.AUTHORIZATION, farmerBearer()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("A1003"));
+    }
+
+    @Test
+    void publicAllowlist_remainsOpen() throws Exception {
+        // 商品读：匿名可访问
+        mockMvc.perform(get("/api/v1/products"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("00000"));
+        // 健康探针：匿名可访问（已在首测断言，这里确认未被拦截）
+        mockMvc.perform(get("/api/v1/healthz"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("00000"));
     }
 
     /** 注册探针控制器（仅测试上下文使用，验证全局异常/租户/校验契约）。 */
