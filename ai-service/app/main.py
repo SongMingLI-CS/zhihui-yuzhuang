@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 
 from app import __version__
 from app.api.health import router as health_router
+from app.api.knowledge import router as knowledge_router
 from app.api.marketing import router as marketing_router
 from app.api.qa import router as qa_router
 from app.config import get_settings
@@ -83,4 +84,5 @@ async def root() -> JSONResponse:
 # 挂载业务路由（前缀 /ai/v1 与 docs/api-spec.yaml 的 ai servers 对齐）
 app.include_router(health_router, prefix=settings.api_prefix)
 app.include_router(qa_router, prefix=settings.api_prefix)
+app.include_router(knowledge_router, prefix=settings.api_prefix)
 app.include_router(marketing_router, prefix=settings.api_prefix)
