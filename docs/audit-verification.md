@@ -15,7 +15,7 @@
 | H5 消费者闭环不完整 | ✅ 属实 | `h5/src/App.tsx` 仅浏览+下单+问答；`h5/src/lib/http.ts` 无订单查询 | 阶段3（待立项） |
 | 移动协同端为空 | ✅ 属实 | `mobile/` 仅 README | 阶段3+（待立项） |
 | 大屏=demo 数据 | ✅ 属实（已修复） | 历史 `dashboard/page.tsx` 消费 `@/lib/demo`（METRICS/SALES_SHARE/buildTrend）并带演示徽标 | 阶段3 已闭环：`GET /dashboard/summary` 真实聚合 + web 60s 轮询切换；徽标改「实时经营数据」 |
-| 知识库静态 | ✅ 属实 | `web/src/app/knowledge/page.tsx` 文档清单来自 demo | 阶段3 续：知识库上传/解析后端（待立项） |
+| 知识库静态 | ✅ 属实（已修复） | 历史 `web/src/app/knowledge/page.tsx` 文档清单来自 demo | 阶段3 已闭环：ai-service `/ai/v1/knowledge/docs`（上传 .txt/.md → 切片/向量入库 + 列表 + 删除）+ web 实时列表/上传；PDF/解析增强待后续 |
 | AI 审批无后端事实 | ✅ 属实 | `web/src/app/agents/page.tsx` approved 为本地 state，「模拟同步/模拟推送」仅前端 | 阶段3（待立项） |
 | 高并发叙事与实现偏差 | ✅ 属实 | `OrderServiceImpl`：checkout 为同步事务 CAS→落库→outbox，Redis Streams 仅事件投递 | 文档侧已纠正；后续立项：网关削峰/队列化 |
 | Outbox 多实例发布竞争 | ✅ 属实（存在缓解） | 历史 `OutboxSweeper.selectPendingBatch` 无 claim/lease，双实例可重复 XADD；消费端以 outbox `PROCESSED` 幂等回写 | 阶段3 已闭环：发布端租约认领（V3 列 + `claimById` 条件 UPDATE + lease 到期接管），失败/完成即清租约 |
@@ -72,8 +72,8 @@
 - 真实支付通道化：验签/回调/退款/对账/金额二次校验、沙箱→真实渠道 Adapter（设计见 `docs/payment-closeout-design.md`）。
 - 手动取消（MANUAL_CANCEL）接口与「开始拣货 PENDING→PICKING」入口待补（与 M 端协同联动）。
 - C 端下单仍以 header 表达店铺租户（无消费者身份）；未来接入登录/限流后收敛。
-- AI 端点无身份/限流治理；AI 评测缺门槛基线。
-- knowledge 知识库列表仍为 demo 静态数据（上传/解析后端待立项，dashboard 已切换真实聚合）。
+- AI 端点（qa/marketing/knowledge）当前无身份/限流治理（含上传入口），AI 评测缺门槛基线 → 待 AI 治理阶段统一收敛。
+- H5 订单中心（消费者闭环补强）。
 - 数据库迁移与生产部署动作需在部署环境执行（本机 Docker 5432/8080 被占用，无法本地跑 go-live）。
 
 ## 六、实现与验证状态
@@ -94,18 +94,22 @@
 | `b2ebb54` | backend tests：DashboardSummaryTest（口径/隔离/补零/端点契约）→ **99/99 绿** |
 | `f47de79` | web：dashboard 切真实经营聚合数据（60s 轮询，失败红标） |
 | `1ceb6d4` | docs：api-spec `/dashboard/summary` 契约 + 台账更新 |
+| `c7fe1ee` | ai-service（阶段3）：知识库管理端点（上传 .txt/.md → 切片/向量入库 + 列表 + 删除） |
+| `2bd9a3c` | web：knowledge 页真实知识库列表 + 上传/刷新（徽标改实时/失败） |
+| `（待回填）` | docs：api-spec `/ai/v1/knowledge/docs` 契约 + 台账更新 |
 
 ### 6.2 验证命令与结果
 - `cd backend && mvn test`：全量 **Tests run 99, Failures 0, Errors 0**（H2 test profile，含支付/关单/outbox 租约/dashboard 聚合用例）。
 - Flyway：container/dev 启动自动迁移；存量库 baseline-on-migrate；测试上下文 `spring.flyway.enabled=false` 保持 H2 自举。
 - `cd web && npm run typecheck`：通过；`npm run lint`：No warnings or errors。
-- h5 / ai-service：阶段1-2 未改其代码（仅 ai-service 模块内端口文档遗留，归其模块后续修正）。
+- ai-service：`python -m py_compile` + `import app.main`（路由 11 条，含 knowledge）通过；DB 写入/检索路径需在有 PG(pgvector) 环境联调（本机 PG 被占用）。
+- h5：阶段1-3 未改其代码。
 
 ### 6.3 残留风险（后续立项跟踪）
 - 真实支付通道化与退款/对账（沙箱→真实 Adapter；设计见 payment-closeout-design.md）。
 - 手动取消接口、PENDING→PICKING 开始拣货入口（M 端协同联动）。
 - C 端下单仍以 header 表达店铺租户（匿名无身份，接入消费者登录后收敛）。
-- AI 端点治理与评测门槛、knowledge demo 数据收敛与上传/解析、H5 订单中心（阶段3 续）。
+- AI 端点治理与评测门槛、H5 订单中心（阶段3 续）。
 - 商品 `version` 列存在但未启用 `@Version` 全量 OCC；已有加载+作用域+条件更新兜底，完整 OCC 与后续优化一并推进。
 - ai-service 模块内 `DATABASE_URL`/文档的 5432 表述与宿主机 5433 对齐，留待 ai-service 模块维护时处理（避免越模块改动）。
 

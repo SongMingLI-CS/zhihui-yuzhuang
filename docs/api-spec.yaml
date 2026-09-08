@@ -524,6 +524,91 @@ paths:
         '422':
           $ref: '#/components/responses/StandardErrorResponse'
 
+  # ==========================================
+  # 知识库管理 (FastAPI · 切片/向量入库 · 当前无身份校验，待 AI 治理阶段收敛)
+  # ==========================================
+  /knowledge/docs:
+    get:
+      summary: 列出知识文档（本租户 ∪ global，按入库时间倒序）
+      operationId: listKnowledgeDocs
+      parameters:
+        - in: header
+          name: X-Tenant-Id
+          required: false
+          schema:
+            type: string
+            default: "global"
+          description: 租户标识（含 global 共享知识库）
+      responses:
+        '200':
+          description: 文档元信息列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/KnowledgeDocItem'
+
+    post:
+      summary: 上传知识文档（.txt/.md → 切片 → 向量化入库）
+      operationId: uploadKnowledgeDoc
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                tenant_id:
+                  type: string
+                  default: "global"
+                category:
+                  type: string
+                  default: "GENERAL"
+      responses:
+        '200':
+          description: 入库成功摘要
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/KnowledgeUploadResponse'
+        '400':
+          $ref: '#/components/responses/StandardErrorResponse'
+
+  /knowledge/docs/delete:
+    post:
+      summary: 删除指定租户知识文档（幂等）
+      operationId: deleteKnowledgeDoc
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KnowledgeDeleteRequest'
+      responses:
+        '200':
+          description: 删除结果（deleted=已删切片行数）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/KnowledgeDeleteResponse'
+
 components:
   securitySchemes:
     BearerAuth:
@@ -1093,6 +1178,73 @@ components:
               salesAmount:
                 type: number
                 format: double
+
+    # 知识库文档元信息（t_knowledge_chunk 聚合）
+    KnowledgeDocItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: "yuzhuang_wheat_guide"
+        tenantId:
+          type: string
+          example: "tenant_yuzhuang_001"
+        tenantName:
+          type: string
+          example: "鹿邑试量镇于庄村股份经济合作社"
+        source:
+          type: string
+          example: "yuzhuang_wheat_guide.txt"
+        category:
+          type: string
+          example: "GENERAL"
+        chunks:
+          type: integer
+          example: 24
+        status:
+          type: string
+          enum: [READY]
+          example: "READY"
+        createdAt:
+          type: string
+          format: date-time
+
+    KnowledgeUploadResponse:
+      type: object
+      properties:
+        title:
+          type: string
+        tenantId:
+          type: string
+        category:
+          type: string
+        chunks:
+          type: integer
+        embeddingMode:
+          type: string
+          enum: [Mock, Real]
+          description: 未配置 Embedding 密钥时自动 Mock（离线可跑）
+
+    KnowledgeDeleteRequest:
+      type: object
+      required: [tenantId, title]
+      properties:
+        tenantId:
+          type: string
+          maxLength: 64
+        title:
+          type: string
+          maxLength: 255
+
+    KnowledgeDeleteResponse:
+      type: object
+      properties:
+        deleted:
+          type: integer
+          description: 已删除的切片行数
 
   responses:
     StandardErrorResponse:
