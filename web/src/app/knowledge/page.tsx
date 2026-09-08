@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import {
   BookOpenCheck,
   Bot,
@@ -8,15 +8,21 @@ import {
   Info,
   Layers,
   Library,
+  Loader2,
   MessageSquareText,
+  RefreshCw,
   Search,
+  UploadCloud,
 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyBlock } from '@/components/ui/StateView';
+import { useToast } from '@/components/ui/Toast';
 import { QaDrawer } from '@/components/knowledge/QaDrawer';
-import { AGRI_QUICK_QUESTIONS, KNOWLEDGE_DOCS, type DocStatus } from '@/lib/demo';
+import { AGRI_QUICK_QUESTIONS, type DocStatus, type KnowledgeDoc } from '@/lib/demo';
+import { fetchKnowledgeDocs, toApiError, uploadKnowledgeDoc } from '@/lib/http';
+import type { KnowledgeDocMeta } from '@/lib/types';
 import { formatInt } from '@/lib/format';
 
 const STATUS_META: Record<DocStatus, { label: string; tone: 'green' | 'amber' | 'red' }> = {
@@ -25,38 +31,94 @@ const STATUS_META: Record<DocStatus, { label: string; tone: 'green' | 'amber' | 
   FAILED: { label: '失败', tone: 'red' },
 };
 
-/** 点击某篇文档 → 预填针对该文档的检索问题 */
-const SUGGEST: Record<number, string> = {
-  1: '冬小麦播种期的关键技术要点有哪些？',
-  2: '小麦常见真菌病（纹枯病等）如何防治？',
-  3: '冬小麦返青期如何追肥与浇水？',
-  4: '河南省乡村振兴特色产业有哪些扶持政策？',
-  5: '小磨香油的传统制作工艺是怎样的？',
-};
+/** 租户显示名：global → 全局知识库；其余回退租户 ID。 */
+function tenantLabel(tenantId: string): string {
+  return tenantId === 'global' ? '全局知识库' : tenantId;
+}
+
+/** 展示时间：ISO 掐头为「YYYY-MM-DD HH:mm」。 */
+function fmtCreated(iso: string): string {
+  return iso ? iso.replace('T', ' ').slice(0, 16) : '';
+}
+
+/** 将 ai-service 元信息映射为表格视图行（status 固定 READY，同步入库成功即就绪）。 */
+function toViewDoc(meta: KnowledgeDocMeta): KnowledgeDoc {
+  return {
+    id: meta.id,
+    title: meta.title,
+    tenantId: meta.tenantId,
+    tenantName: tenantLabel(meta.tenantId),
+    source: meta.source,
+    chunks: meta.chunks,
+    status: 'READY',
+    createdAt: fmtCreated(meta.createdAt),
+  };
+}
 
 export default function KnowledgePage() {
+  const { notify } = useToast();
+  const fileRef = useRef<HTMLInputElement | null>(null);
   const [query, setQuery] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [initialQuestion, setInitialQuestion] = useState<string | null>(null);
 
+  // 真实知识库元数据（ai-service /knowledge/docs），null=首次加载中
+  const [realDocs, setRealDocs] = useState<KnowledgeDocMeta[] | null>(null);
+  const [listState, setListState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [uploading, setUploading] = useState(false);
+
+  async function refreshDocs() {
+    try {
+      const list = await fetchKnowledgeDocs();
+      setRealDocs(list);
+      setListState('ready');
+    } catch (err) {
+      setListState('error');
+      setRealDocs([]);
+      notify('error', '知识库列表加载失败', toApiError(err).message);
+    }
+  }
+
+  useEffect(() => {
+    void refreshDocs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploading(true);
+    try {
+      const result = await uploadKnowledgeDoc(file);
+      notify('success', '入库成功', `《${result.title}》已切片 ${result.chunks} 片（${result.embeddingMode} 向量）`);
+      await refreshDocs();
+    } catch (err) {
+      notify('error', '入库失败', toApiError(err).message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
   const totalChunks = useMemo(
-    () => KNOWLEDGE_DOCS.reduce((s, d) => s + d.chunks, 0),
-    [],
+    () => (realDocs ?? []).reduce((s, d) => s + d.chunks, 0),
+    [realDocs],
   );
 
   const docs = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return KNOWLEDGE_DOCS;
-    return KNOWLEDGE_DOCS.filter(
+    const source = (realDocs ?? []).map(toViewDoc);
+    if (!q) return source;
+    return source.filter(
       (d) =>
         d.title.toLowerCase().includes(q) ||
         d.tenantName.toLowerCase().includes(q) ||
         d.source.toLowerCase().includes(q),
     );
-  }, [query]);
+  }, [realDocs, query]);
 
-  const openVerify = (docId: number) => {
-    setInitialQuestion(SUGGEST[docId] ?? AGRI_QUICK_QUESTIONS[0]);
+  const openVerify = (item: KnowledgeDoc) => {
+    setInitialQuestion(AGRI_QUICK_QUESTIONS[Math.max(0, (item.id - 1) % AGRI_QUICK_QUESTIONS.length)]);
     setDrawerOpen(true);
   };
 
@@ -71,7 +133,12 @@ export default function KnowledgePage() {
         eyebrow="KNOWLEDGE & RAG"
         title="农技知识库"
         description="统一管理农技与惠农政策资料，通过可溯源检索验证每条 AI 回答。"
-        actions={<Badge tone="amber"><Info size={12} />演示数据</Badge>}
+        actions={
+          <Badge tone={listState === 'error' ? 'red' : listState === 'ready' ? 'green' : 'amber'}>
+            <Info size={12} />
+            {listState === 'ready' ? '实时数据' : listState === 'error' ? '加载失败' : '加载中'}
+          </Badge>
+        }
       />
 
       {/* 概览条 */}
@@ -82,7 +149,7 @@ export default function KnowledgePage() {
               <Library size={18} />
             </span>
             <div>
-              <p className="num text-xl font-bold text-slate-800">{KNOWLEDGE_DOCS.length} 篇</p>
+              <p className="num text-xl font-bold text-slate-800">{realDocs?.length ?? 0} 篇</p>
               <p className="text-xs text-slate-400">已接入知识文献</p>
             </div>
           </div>
@@ -131,11 +198,37 @@ export default function KnowledgePage() {
             <button
               type="button"
               onClick={openEmpty}
-              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-brand-700 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-800"
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-brand-200 bg-brand-50 px-3 text-xs font-semibold text-brand-700 transition hover:bg-brand-700 hover:text-white"
             >
               <Bot size={14} />
               农技检索验证
             </button>
+            <button
+              type="button"
+              onClick={() => void refreshDocs()}
+              disabled={listState === 'loading'}
+              className="inline-flex h-9 shrink-0 items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 text-slate-500 shadow-sm transition hover:border-brand-300 hover:text-brand-700 disabled:opacity-60"
+              aria-label="刷新知识库列表"
+              title="刷新列表"
+            >
+              <RefreshCw size={14} className={listState === 'loading' ? 'animate-spin' : ''} />
+            </button>
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-brand-700 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-800 disabled:opacity-60"
+            >
+              {uploading ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
+              {uploading ? '切片入库中' : '上传知识文档'}
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".txt,.md,.markdown"
+              className="hidden"
+              onChange={handleFileChange}
+            />
           </div>
         }
         bodyClassName="p-0"
@@ -192,7 +285,7 @@ export default function KnowledgePage() {
                     <td className="px-5 py-3.5 text-right">
                       <button
                         type="button"
-                        onClick={() => openVerify(d.id)}
+                        onClick={() => openVerify(d)}
                         className="inline-flex items-center gap-1 rounded-lg border border-brand-200 px-2.5 py-1 text-xs font-medium text-brand-700 transition hover:bg-brand-700 hover:text-white"
                       >
                         <Bot size={12} />
@@ -228,7 +321,7 @@ export default function KnowledgePage() {
                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400">
                       <span>{d.chunks} 个切片</span><span>{d.createdAt}</span>
                     </div>
-                    <button type="button" onClick={() => openVerify(d.id)} className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-brand-200 bg-brand-50 px-3 text-xs font-semibold text-brand-700">
+                    <button type="button" onClick={() => openVerify(d)} className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-brand-200 bg-brand-50 px-3 text-xs font-semibold text-brand-700">
                       <Bot size={13} />检索验证
                     </button>
                   </div>

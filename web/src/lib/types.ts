@@ -69,6 +69,31 @@ export interface DashboardSummary {
   topProducts: DashboardTopProduct[];
 }
 
+/* ===================== 知识库文档管理（/ai/v1/knowledge/docs） ===================== */
+
+export interface KnowledgeDocMeta {
+  id: number;
+  title: string;
+  tenantId: string;
+  source: string;
+  category: string;
+  chunks: number;
+  status: 'READY';
+  createdAt: string;
+}
+
+export interface KnowledgeUploadResult {
+  title: string;
+  tenantId: string;
+  category: string;
+  chunks: number;
+  embeddingMode: string;
+}
+
+export interface KnowledgeDeleteResult {
+  deleted: number;
+}
+
 /* ===================== 农技问答（POST /ai/v1/qa/ask） ===================== */
 
 export type AgriCategory = 'DISEASE_PEST' | 'FERTILIZER' | 'POLICY' | 'GENERAL';

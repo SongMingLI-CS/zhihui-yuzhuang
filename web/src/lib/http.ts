@@ -16,6 +16,9 @@ import type {
   Product,
   ProductUpsertRequest,
   DashboardSummary,
+  KnowledgeDocMeta,
+  KnowledgeDeleteResult,
+  KnowledgeUploadResult,
 } from './types';
 
 /** 业务/网络错误统一封装（携带契约 code 与 HTTP 状态） */
@@ -115,6 +118,40 @@ export async function login(payload: AuthLoginRequest): Promise<AuthLoginRespons
 
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {
   const res = await http.get<ApiResponse<DashboardSummary>>(`${API_BASE}/dashboard/summary`);
+  return unwrap(res);
+}
+
+/* ===================== 知识库文档管理（/ai/v1/knowledge/docs） ===================== */
+
+/** 列出本租户 ∪ global 的知识文档（ai-service 聚合元信息）。 */
+export async function fetchKnowledgeDocs(): Promise<KnowledgeDocMeta[]> {
+  const res = await http.get<ApiResponse<KnowledgeDocMeta[]>>(`${AI_BASE}/knowledge/docs`);
+  return unwrap(res);
+}
+
+/** 上传 .txt/.md 文档：服务端切片 + 向量化 + 入库（Embedding 未配置密钥时自动 Mock）。 */
+export async function uploadKnowledgeDoc(file: File): Promise<KnowledgeUploadResult> {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('tenant_id', getTenant().id);
+  form.append('category', 'GENERAL');
+  const res = await http.post<ApiResponse<KnowledgeUploadResult>>(
+    `${AI_BASE}/knowledge/docs/upload`,
+    form,
+    { timeout: 120_000 },
+  );
+  return unwrap(res);
+}
+
+/** 删除指定租户下的知识文档（幂等）。 */
+export async function deleteKnowledgeDoc(
+  tenantId: string,
+  title: string,
+): Promise<KnowledgeDeleteResult> {
+  const res = await http.post<ApiResponse<KnowledgeDeleteResult>>(
+    `${AI_BASE}/knowledge/docs/delete`,
+    { tenantId, title },
+  );
   return unwrap(res);
 }
 
