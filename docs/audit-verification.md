@@ -96,7 +96,7 @@
 | `1ceb6d4` | docs：api-spec `/dashboard/summary` 契约 + 台账更新 |
 | `c7fe1ee` | ai-service（阶段3）：知识库管理端点（上传 .txt/.md → 切片/向量入库 + 列表 + 删除） |
 | `2bd9a3c` | web：knowledge 页真实知识库列表 + 上传/刷新（徽标改实时/失败） |
-| `（待回填）` | docs：api-spec `/ai/v1/knowledge/docs` 契约 + 台账更新 |
+| `2250c43` | docs：api-spec `/ai/v1/knowledge/docs` 契约 + 台账更新 |
 
 ### 6.2 验证命令与结果
 - `cd backend && mvn test`：全量 **Tests run 99, Failures 0, Errors 0**（H2 test profile，含支付/关单/outbox 租约/dashboard 聚合用例）。
