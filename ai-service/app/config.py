@@ -55,6 +55,13 @@ class Settings(BaseSettings):
     db_connect_timeout: float = Field(default=10.0, ge=1.0, description="连接/获取连接超时（秒）")
     db_command_timeout: float = Field(default=30.0, ge=1.0, description="单条命令超时（秒）")
 
+    # ---------- 身份验证（与业务后端同密钥 / 同契约）----------
+    # AUTH_JWT_SECRET：HS256 密钥，必须与 backend 的 yuzhuang.auth.secret 一致。
+    # 留空时回退 app.auth.DEV_JWT_SECRET（仅开发/演示），生产必须显式注入。
+    auth_jwt_secret: str = ""
+    # 演示开关：仅 DEMO_MODE=true 时允许伪随机 Embedding 与离线营销模板（见阶段 F）。
+    demo_mode: bool = False
+
     # ---------- DeepSeek (LLM) ----------
     deepseek_api_key: str = ""
     deepseek_base_url: str = DEFAULT_DEEPSEEK_BASE_URL
@@ -82,13 +89,32 @@ class Settings(BaseSettings):
         return bool(self.deepseek_api_key)
 
     @property
+    def is_production(self) -> bool:
+        """是否生产环境（production / prod）。"""
+        return self.app_env.strip().lower() in {"production", "prod"}
+
+    @property
+    def mock_allowed(self) -> bool:
+        """是否允许伪随机 Embedding / 离线营销模板。
+
+        仅当显式 ``DEMO_MODE=true`` 或运行于非生产环境时允许；
+        生产环境缺少真实能力时必须显式报“不可用”，不得伪装成真实 AI。
+        """
+        return self.demo_mode or not self.is_production
+
+    @property
+    def embedding_configured(self) -> bool:
+        """是否配置了真实 Embedding 密钥（EMBEDDING_API_KEY 或回退 DEEPSEEK_API_KEY）。"""
+        return bool(self.embedding_api_key_effective)
+
+    @property
     def embedding_api_key_effective(self) -> str:
         """实际生效的 Embedding 密钥：EMBEDDING_API_KEY 为空时回退 DEEPSEEK_API_KEY。"""
         return self.embedding_api_key or self.deepseek_api_key
 
     @property
     def embedding_enabled(self) -> bool:
-        """是否已配置有效 Embedding 密钥；未配置时 Embedder 自动进入 Mock 模式。"""
+        """是否可用真实 Embedding（配置了密钥）。"""
         return bool(self.embedding_api_key_effective)
 
 

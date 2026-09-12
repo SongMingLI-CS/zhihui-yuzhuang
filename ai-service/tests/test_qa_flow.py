@@ -382,12 +382,20 @@ async def _http_level_checks(samples: List[dict]) -> dict:
     )
 
     transport = ASGITransport(app=app)
+    # 阶段 B：QA 支持匿名（公共域）与认证（本租户域）；本用例验证认证租户域召回
+    from app.auth import ROLE_VILLAGE, create_token  # noqa: PLC0415
+
+    auth_headers = {
+        "X-Tenant-Id": TARGET_TENANT,
+        "Authorization": "Bearer "
+        + create_token("admin", ROLE_VILLAGE, TARGET_TENANT, user_id=1),
+    }
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         for case in payload_cases:
             resp = await client.post(
                 "/ai/v1/qa/ask",
                 json=case["body"],
-                headers={"X-Tenant-Id": TARGET_TENANT},
+                headers=auth_headers,
             )
             assert resp.status_code == 200, f"{case['name']} HTTP {resp.status_code}"
             body = resp.json()

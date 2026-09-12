@@ -53,6 +53,10 @@ from app.schemas.marketing import (
 logger = logging.getLogger(__name__)
 
 
+class MarketingUnavailableError(RuntimeError):
+    """营销生成不可用（生产未配置 LLM 密钥且不允许离线模板）。"""
+
+
 class MarketingOrchestrator:
     """串联 TrendAgent → CopywriterAgent → ComplianceAgent 的营销生成编排器。"""
 
@@ -74,6 +78,7 @@ class MarketingOrchestrator:
         self.compliance_agent = ComplianceAgent()
 
         online = bool(getattr(self.llm, "available", False)) and not self.force_offline
+        self.online = online
         logger.info(
             "MarketingOrchestrator 就绪（%s）：TrendAgent→CopywriterAgent→ComplianceAgent",
             "DeepSeek 在线" if online else "离线 Mock 模板",
@@ -84,7 +89,17 @@ class MarketingOrchestrator:
         request: MarketingGenerateRequest,
         tenant_id: str = "global",
     ) -> MarketingGenerateResponse:
-        """执行多 Agent 协同生成 + 合规质检全链路。"""
+        """执行多 Agent 协同生成 + 合规质检全链路。
+
+        降级边界（阶段 F）：生产环境未配置 ``DEEPSEEK_API_KEY`` 且未显式 ``force_offline``
+        时抛 :class:`MarketingUnavailableError`，由路由返回明确“不可用”，
+        **不**返回离线模板伪装成真实生成结果。
+        """
+        if not self.online and not self.settings.mock_allowed:
+            raise MarketingUnavailableError(
+                "生产环境未配置 DEEPSEEK_API_KEY：营销文案生成不可用（请配置密钥或开启 DEMO_MODE 演示）"
+            )
+
         # 1) TrendAgent：乡土文化切入点
         angles, trend_summary = await self.trend_agent.run(request)
 
@@ -132,5 +147,6 @@ def build_marketing_orchestrator(**kwargs) -> MarketingOrchestrator:
 
 __all__ = [
     "MarketingOrchestrator",
+    "MarketingUnavailableError",
     "build_marketing_orchestrator",
 ]

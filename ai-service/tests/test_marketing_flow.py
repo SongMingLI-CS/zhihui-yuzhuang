@@ -247,6 +247,14 @@ async def _http_level_checks() -> dict:
 
     summary: dict = {}
     transport = ASGITransport(app=app)
+    # 阶段 B：营销端点需认证；使用与 backend 同契约的令牌（租户来自身份）
+    from app.auth import ROLE_COOPERATIVE, create_token  # noqa: PLC0415
+
+    auth_headers = {
+        "X-Tenant-Id": TARGET_TENANT,
+        "Authorization": "Bearer "
+        + create_token("coop001", ROLE_COOPERATIVE, TARGET_TENANT, user_id=2),
+    }
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         cases = [
             {"name": "benign", "payload": BENIGN_PAYLOAD, "expect_passed": True},
@@ -256,7 +264,7 @@ async def _http_level_checks() -> dict:
             resp = await client.post(
                 "/ai/v1/marketing/generate",
                 json=case["payload"],
-                headers={"X-Tenant-Id": TARGET_TENANT},
+                headers=auth_headers,
             )
             assert resp.status_code == 200, f"http[{case['name']}] HTTP {resp.status_code}"
             body = resp.json()

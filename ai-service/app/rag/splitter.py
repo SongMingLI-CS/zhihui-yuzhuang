@@ -85,6 +85,11 @@ def _normalize_markdown(md_text: str) -> str:
     return text
 
 
+def normalize_markdown(md_text: str) -> str:
+    """公开包装：供上传链路（document_loader）在切片前清洗 Markdown 正文。"""
+    return _normalize_markdown(md_text)
+
+
 class DocumentSplitter:
     """文档切片器。
 

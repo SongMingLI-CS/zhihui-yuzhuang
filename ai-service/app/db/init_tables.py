@@ -23,9 +23,14 @@ settings = get_settings()
 
 __all__ = [
     "KNOWLEDGE_CHUNK_TABLE",
+    "KNOWLEDGE_DOC_TABLE",
+    "KNOWLEDGE_DOC_VERSION_TABLE",
     "EMBEDDING_DIM",
     "CREATE_KNOWLEDGE_CHUNK_TABLE_SQL",
     "CREATE_KNOWLEDGE_CHUNK_INDEX_SQL",
+    "CREATE_KNOWLEDGE_DOC_TABLE_SQL",
+    "CREATE_KNOWLEDGE_DOC_VERSION_TABLE_SQL",
+    "CREATE_KNOWLEDGE_DOC_INDEX_SQL",
     "init_knowledge_chunk_table",
     "init_knowledge_chunk_table_sync",
 ]
@@ -61,6 +66,57 @@ ON {KNOWLEDGE_CHUNK_TABLE} USING hnsw (embedding vector_cosine_ops);
 # ON {KNOWLEDGE_CHUNK_TABLE} USING ivfflat (embedding vector_cosine_ops)
 # WITH (lists = 100);
 
+# ============================================================
+# 阶段 F：文档登记表（当前版本元数据 + 版本历史 + 审核状态）
+# ============================================================
+
+KNOWLEDGE_DOC_TABLE = "t_knowledge_doc"
+KNOWLEDGE_DOC_VERSION_TABLE = "t_knowledge_doc_version"
+
+CREATE_KNOWLEDGE_DOC_TABLE_SQL = f"""
+CREATE TABLE IF NOT EXISTS {KNOWLEDGE_DOC_TABLE} (
+    id              BIGSERIAL PRIMARY KEY,
+    tenant_id       VARCHAR(64)  NOT NULL,
+    doc_title       VARCHAR(255) NOT NULL,
+    source_file     VARCHAR(255) NOT NULL,
+    content_type    VARCHAR(64)  NOT NULL DEFAULT 'text/plain',
+    content_sha256  CHAR(64)     NOT NULL,
+    file_size       BIGINT       NOT NULL DEFAULT 0,
+    category        VARCHAR(64)  NOT NULL DEFAULT 'GENERAL',
+    version         INT          NOT NULL DEFAULT 1,
+    pages           INT          NOT NULL DEFAULT 1,
+    chunks          INT          NOT NULL DEFAULT 0,
+    review_status   VARCHAR(24)  NOT NULL DEFAULT 'PENDING_REVIEW',
+    uploaded_by     VARCHAR(64),
+    uploaded_at     TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    reviewed_by     VARCHAR(64),
+    reviewed_at     TIMESTAMPTZ,
+    review_comment  VARCHAR(512),
+    CONSTRAINT uk_knowledge_doc_tenant_title UNIQUE (tenant_id, doc_title)
+);
+"""
+
+CREATE_KNOWLEDGE_DOC_VERSION_TABLE_SQL = f"""
+CREATE TABLE IF NOT EXISTS {KNOWLEDGE_DOC_VERSION_TABLE} (
+    id              BIGSERIAL PRIMARY KEY,
+    tenant_id       VARCHAR(64)  NOT NULL,
+    doc_title       VARCHAR(255) NOT NULL,
+    version         INT          NOT NULL,
+    content_sha256  CHAR(64)     NOT NULL,
+    file_size       BIGINT       NOT NULL DEFAULT 0,
+    chunks          INT          NOT NULL DEFAULT 0,
+    uploaded_by     VARCHAR(64),
+    uploaded_at     TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_knowledge_doc_version UNIQUE (tenant_id, doc_title, version)
+);
+"""
+
+CREATE_KNOWLEDGE_DOC_INDEX_SQL = (
+    f"CREATE INDEX IF NOT EXISTS idx_{KNOWLEDGE_DOC_TABLE}_tenant "
+    f"ON {KNOWLEDGE_DOC_TABLE} (tenant_id, uploaded_at DESC);"
+)
+
+
 
 async def init_knowledge_chunk_table() -> None:
     """异步初始化：确保 vector 扩展 + ``t_knowledge_chunk`` 表 + HNSW 索引就绪。
@@ -73,6 +129,9 @@ async def init_knowledge_chunk_table() -> None:
             await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
             await conn.execute(CREATE_KNOWLEDGE_CHUNK_TABLE_SQL)
             await conn.execute(CREATE_KNOWLEDGE_CHUNK_INDEX_SQL)
+            await conn.execute(CREATE_KNOWLEDGE_DOC_TABLE_SQL)
+            await conn.execute(CREATE_KNOWLEDGE_DOC_VERSION_TABLE_SQL)
+            await conn.execute(CREATE_KNOWLEDGE_DOC_INDEX_SQL)
     finally:
         await conn.close()
 
@@ -88,5 +147,8 @@ def init_knowledge_chunk_table_sync() -> None:
             conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
             conn.execute(CREATE_KNOWLEDGE_CHUNK_TABLE_SQL)
             conn.execute(CREATE_KNOWLEDGE_CHUNK_INDEX_SQL)
+            conn.execute(CREATE_KNOWLEDGE_DOC_TABLE_SQL)
+            conn.execute(CREATE_KNOWLEDGE_DOC_VERSION_TABLE_SQL)
+            conn.execute(CREATE_KNOWLEDGE_DOC_INDEX_SQL)
     finally:
         conn.close()

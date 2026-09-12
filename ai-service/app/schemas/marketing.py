@@ -143,6 +143,9 @@ class ComplianceReport(BaseModel):
 class MarketingGenerateResponse(BaseModel):
     """营销生成响应载荷（data 字段内容）。"""
 
+    taskId: Optional[int] = Field(
+        default=None, description="持久化任务 ID（用于审批/发布留痕；未落库时为 null）"
+    )
     thought_chain: list[AgentThoughtNode] = Field(
         default_factory=list,
         description="Agent 协同思考路径（Trend→Copywriter→Compliance）",
@@ -158,6 +161,39 @@ class MarketingGenerateResponse(BaseModel):
     )
 
 
+class MarketingTaskItem(BaseModel):
+    """营销任务台账条目（持久化审批留痕）。"""
+
+    id: int
+    tenantId: str
+    productName: str
+    complianceScore: int
+    compliancePassed: bool
+    reviewStatus: str = Field(description="PENDING_HUMAN_REVIEW / APPROVED / REJECTED")
+    createdBy: str = ""
+    createdAt: str = ""
+    reviewedBy: str = ""
+    reviewedAt: str = ""
+    reviewComment: str = ""
+    publishedAt: str = ""
+
+
+class MarketingTaskActionRequest(BaseModel):
+    """审批/发布动作请求体。"""
+
+    comment: str = Field(default="", max_length=500, description="审批意见（可选）")
+
+
+class MarketingTaskPage(BaseModel):
+    """营销任务分页结果。"""
+
+    items: list[MarketingTaskItem] = Field(default_factory=list)
+    page: int
+    pageSize: int
+    total: int
+    totalPages: int
+
+
 __all__ = [
     "MarketingChannel",
     "DEFAULT_CHANNELS",
@@ -168,4 +204,7 @@ __all__ = [
     "MarketingCopyItem",
     "ComplianceReport",
     "MarketingGenerateResponse",
+    "MarketingTaskItem",
+    "MarketingTaskActionRequest",
+    "MarketingTaskPage",
 ]

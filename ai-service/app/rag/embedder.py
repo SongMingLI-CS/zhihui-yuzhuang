@@ -1,19 +1,15 @@
-"""向量化客户端：封装 OpenAI SDK 的 ``client.embeddings.create``。
+"""Embedder（文本向量化客户端）。
 
-DeepSeek 暂无官方 Embedding API，因此 Embedding 的密钥 / 基址 / 模型 / 维度
-均独立配置（见 :mod:`app.config` 的 ``EMBEDDING_*``），走 OpenAI 兼容端点。
+安全/降级约定（阶段 F）：
+- 已配置有效密钥 → ``REAL``：调用 OpenAI 兼容 Embedding 端点；
+- 未配置密钥但允许降级（``DEMO_MODE=true`` 或非生产）→ ``MOCK``：
+  输出确定性伪随机单位向量，保证离线联调可跑；
+- 生产环境未配置密钥 → ``UNAVAILABLE``：``embed_texts`` 抛
+  :class:`EmbeddingUnavailableError`，调用方须显式返回“不可用”，
+  **不得**回退伪随机向量的伪装结果。
 
-Mock 模式：
-- 当未配置任何有效 Embedding 密钥（``EMBEDDING_API_KEY`` 为空且回退的
-  ``DEEPSEEK_API_KEY`` 也为空）时，:class:`Embedder` 自动进入 Mock 模式，
-  输出**确定性**伪随机单位向量（同一文本 → 同一向量），
-  保证断网 / 离线单测与本地联调可跑通；
-- 也可通过 ``force_mock=True`` 显式开启。
-
-类型适配（重要）：pgvector / psycopg 只认 :class:`pgvector.Vector` 对象，
-:meth:`Embedder.embed_texts` 返回的正是 ``list[Vector]``（已用
-``app.db.session.Vector`` 包装）。写库 / 检索时**严禁**直接传 Python list，
-否则会触发 ``DatatypeMismatch``。
+类型适配：pgvector / psycopg 只认 :class:`pgvector.Vector`，
+:meth:`Embedder.embed_texts` 返回 ``list[Vector]``；写库/检索严禁直接传 Python list。
 """
 
 from __future__ import annotations
@@ -22,7 +18,7 @@ import hashlib
 import logging
 import math
 import random
-from typing import List, Optional, Sequence, Union
+from typing import List, Optional, Sequence
 
 from openai import OpenAI
 
@@ -35,8 +31,12 @@ logger = logging.getLogger(__name__)
 DEFAULT_BATCH_SIZE = 64
 
 
+class EmbeddingUnavailableError(RuntimeError):
+    """Embedding 不可用（生产未配置真实密钥，且不允许降级）。"""
+
+
 class Embedder:
-    """文本向量化客户端（OpenAI 兼容 Embedding 端点 + Mock 兜底）。"""
+    """文本向量化客户端（OpenAI 兼容端点 + 受控 Mock 兜底）。"""
 
     def __init__(
         self,
@@ -58,41 +58,66 @@ class Embedder:
         effective_key = api_key if api_key is not None else cfg.embedding_api_key_effective
         effective_base_url = base_url or cfg.embedding_base_url
 
-        # 显式传入 force_mock 时遵从其开关；否则按「是否配置了有效密钥」自动判定
-        if force_mock is None:
-            force_mock = not bool(effective_key)
-        self.mock = force_mock
+        self._client = None
+        self.mock = False
+        self.available = True
+        self.unavailable_reason = ""
 
-        if self.mock:
-            self._client = None
-            logger.warning(
-                "Embedder 进入 Mock 模式（未配置有效 Embedding 密钥），"
-                "将生成确定性伪随机向量 dim=%d model=%s",
-                self.dim,
-                self.model,
-            )
-        else:
+        if force_mock is True:
+            # 显式要求离线（测试/联调）：即使生产也尊重调用方显式意图
+            self.mock = True
+        elif effective_key:
             self._client = OpenAI(api_key=effective_key, base_url=effective_base_url)
             logger.info(
-                "Embedder 就绪 base_url=%s model=%s dim=%d",
+                "Embedder 就绪(REAL) base_url=%s model=%s dim=%d",
                 effective_base_url,
                 self.model,
                 self.dim,
             )
+        elif cfg.mock_allowed:
+            self.mock = True
+        else:
+            self.available = False
+            self.unavailable_reason = (
+                "生产环境未配置 EMBEDDING_API_KEY/DEEPSEEK_API_KEY，且不允许降级（DEMO_MODE=false）"
+            )
+
+        if self.mock:
+            logger.warning(
+                "Embedder 进入 MOCK 模式（确定性伪随机向量）dim=%d model=%s app_env=%s demo=%s",
+                self.dim,
+                self.model,
+                cfg.app_env,
+                cfg.demo_mode,
+            )
+        elif not self.available:
+            logger.error("Embedder 不可用：%s", self.unavailable_reason)
 
     @property
     def is_mock(self) -> bool:
         """是否处于 Mock 模式。"""
         return self.mock
 
-    def embed_texts(self, texts: Sequence[str]) -> List[Vector]:
-        """批量向量化，返回 ``list[Vector]``（顺序与入参一致）。
+    @property
+    def is_available(self) -> bool:
+        """是否可用于向量化（真实或允许的降级）。"""
+        return self.available
 
-        Mock 模式下直接生成确定性伪随机向量；真实模式下按 ``batch_size``
-        分批调用 ``client.embeddings.create``。
-        """
+    @property
+    def mode(self) -> str:
+        """能力模式：REAL / MOCK / UNAVAILABLE。"""
+        if not self.available:
+            return "UNAVAILABLE"
+        return "MOCK" if self.mock else "REAL"
+
+    def embed_texts(self, texts: Sequence[str]) -> List[Vector]:
+        """批量向量化，返回 ``list[Vector]``（顺序与入参一致）。"""
         if not texts:
             return []
+        if not self.available:
+            raise EmbeddingUnavailableError(
+                self.unavailable_reason or "Embedding 不可用"
+            )
         if self.mock:
             return [Vector(self._mock_vector(t)) for t in texts]
 
@@ -100,7 +125,6 @@ class Embedder:
         for start in range(0, len(texts), self.batch_size):
             batch = list(texts[start : start + self.batch_size])
             response = self._client.embeddings.create(model=self.model, input=batch)
-            # 兼容端点按序返回 data，显式按 index 排序保证顺序稳定
             ordered = sorted(response.data, key=lambda item: item.index)
             if len(ordered) != len(batch):
                 logger.warning("Embedding 返回条数(%d)与请求条数(%d)不一致", len(ordered), len(batch))
@@ -115,13 +139,9 @@ class Embedder:
     # ------------------------------------------------------------ Mock 内部
 
     def _mock_vector(self, text: str) -> List[float]:
-        """由文本 sha256 播种的确定性伪随机单位向量。
-
-        保证：同一文本在任意运行 / 机器上得到相同向量（离线单测可断言相等）；
-        输出为单位向量，便于用 ``<=>`` 余弦距离做检索联调。
-        """
+        """由文本 sha256 播种的确定性伪随机单位向量（仅 Mock 模式使用）。"""
         digest = hashlib.sha256(text.encode("utf-8")).digest()
-        rng = random.Random(digest)  # 接受 bytes 种子，确定性可复现
+        rng = random.Random(digest)
         values = [rng.uniform(-1.0, 1.0) for _ in range(self.dim)]
         norm = math.sqrt(sum(v * v for v in values)) or 1.0
         return [v / norm for v in values]
@@ -134,6 +154,8 @@ def build_embedder(**kwargs) -> Embedder:
 
 __all__ = [
     "Embedder",
+    "EmbeddingUnavailableError",
     "build_embedder",
     "DEFAULT_BATCH_SIZE",
 ]
+
