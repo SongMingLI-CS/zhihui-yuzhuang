@@ -173,6 +173,8 @@ export interface AuthLoginResponse {
   token: string;
   tokenType: string;
   expiresIn: number;
+  /** 是否要求首次登录改密（演示账号/管理员重置后为 true） */
+  mustChangePassword?: boolean;
   user: UserInfo;
 }
 
@@ -219,3 +221,107 @@ export interface OrderListParams {
 
 /** POST /api/v1/orders/{orderNo}/ship 成功响应（返回出库后的订单摘要） */
 export type OrderShipResponse = OrderSummary;
+
+/* ===================== 平台管理（GET /api/v1/admin/*） ===================== */
+
+export interface AdminTenant {
+  id: number;
+  tenantId: string;
+  name: string;
+  region?: string | null;
+  status: string;
+  tenantType?: string | null;
+  parentRegion?: string | null;
+  createdAt?: string | null;
+}
+
+export interface AdminUser {
+  id: number;
+  tenantId: string;
+  username: string;
+  displayName: string;
+  role: string;
+  phone?: string | null;
+  status: string;
+  mustChangePassword?: boolean | null;
+  lastLoginAt?: string | null;
+  createdAt?: string | null;
+}
+
+/* ===================== 政府治理（GET /api/v1/gov/summary） ===================== */
+
+/* ===================== 营销任务台账与审批（/ai/v1/marketing/tasks） ===================== */
+
+export type MarketingReviewStatus = 'PENDING_HUMAN_REVIEW' | 'APPROVED' | 'REJECTED';
+
+export interface MarketingTaskItem {
+  id: number;
+  tenantId: string;
+  productName: string;
+  complianceScore: number;
+  compliancePassed: boolean;
+  reviewStatus: MarketingReviewStatus | string;
+  createdBy: string;
+  createdAt: string;
+  reviewedBy: string;
+  reviewedAt: string;
+  reviewComment: string;
+  publishedAt: string;
+}
+
+export interface MarketingTaskPage {
+  items: MarketingTaskItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+
+export interface GovScopeMeta {
+  all: boolean;
+  tenantCount: number;
+  description: string;
+}
+
+export interface GovMetricDefinition {
+  salesAmount: string;
+  orderCount: string;
+  cancelledOrders: string;
+  version: string;
+}
+
+export interface GovTotals {
+  totalOrders: number;
+  totalSales: number;
+  todayOrders: number;
+  todaySales: number;
+  pendingPayOrders: number;
+  readyShipOrders: number;
+}
+
+export interface GovTenantBreakdown {
+  tenantId: string;
+  tenantName: string;
+  region?: string | null;
+  totalOrders: number;
+  totalSales: number;
+  todayOrders: number;
+}
+
+export interface GovSummary {
+  snapshotAt: number;
+  scope: GovScopeMeta;
+  metrics: GovMetricDefinition;
+  totals: GovTotals;
+  breakdown: GovTenantBreakdown[];
+}
+
+/* ===================== 商家工作台（GET /api/v1/merchant/products） ===================== */
+
+export interface MerchantProductParams {
+  status?: string;
+  keyword?: string;
+  page?: number;
+  pageSize?: number;
+}

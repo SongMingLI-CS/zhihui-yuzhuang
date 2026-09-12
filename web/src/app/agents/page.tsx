@@ -20,6 +20,8 @@ import { useToast } from '@/components/ui/Toast';
 import { AgentChain } from '@/components/agents/AgentChain';
 import { CopyPreview } from '@/components/agents/CopyPreview';
 import { CompliancePanel } from '@/components/agents/CompliancePanel';
+import { MarketingTaskLedger } from '@/components/agents/MarketingTaskLedger';
+
 import { PRODUCT_PRESETS } from '@/lib/demo';
 import { generateMarketing, toApiError } from '@/lib/http';
 import { CHANNEL_LABELS } from '@/lib/tenant';
@@ -155,6 +157,11 @@ export default function AgentsPage() {
         description="从产品卖点到分渠道文案、合规检查与人工放行，让生成过程清晰可控。"
         actions={<Badge tone="violet"><Bot size={12} />多智能体编排</Badge>}
       />
+      {/* 阶段 F：持久化营销任务台账与真实审批（approve/reject/publish 由服务端状态机强制） */}
+      <div className="mt-4">
+        <MarketingTaskLedger />
+      </div>
+
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12 xl:gap-5">
         {/* ============ 左：生成表单 ============ */}

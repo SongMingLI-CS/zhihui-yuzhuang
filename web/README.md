@@ -9,6 +9,25 @@
 - 图标：lucide-react
 - 数据请求：axios（`ApiResponse` 信封解包 + `X-Tenant-Id` 多租户头）
 - 网关路由：`/b/*` → `web:3000`（`basePath:'/b'`，浏览器直连同源网关 `/api/v1`、`/ai/v1`）
+- 会话：`HttpOnly+Secure+SameSite` Cookie（`yz_session`）+ CSRF 双提交（`yz_csrf` / `X-CSRF-Token`）；令牌仅存内存，`SessionGuard` 负责 `/b/*` 路由级会话守卫
+
+## 角色分区（2026-09-12 整改）
+
+| 角色 | 落地页 | 可见导航 |
+|---|---|---|
+| `COOPERATIVE` | `/merchant` | 商品管理 · 订单出库 · 知识库 · 营销 Agent |
+| `VILLAGE` | `/dashboard` | 治理大盘 · 商品管理 · 订单出库 · 知识库 · 营销 Agent |
+| `GOVERNMENT` | `/gov` | 仅知识库（只读聚合大屏，无任何写操作入口） |
+| `PLATFORM_ADMIN` | `/platform` | 治理大盘 · 租户/账号管理 |
+
+> 导航过滤仅为体验；**授权一律由后端端点策略强制**（未登录 → `/b/login`，越权 → 403/A1003）。
+
+| 新增路由 | 说明 | 消费接口 |
+|---|---|---|
+| `/merchant` | 商家商品工作台（含草稿/下架/归档，可上下架） | `GET /api/v1/merchant/products`、`PATCH /api/v1/products/{id}/status` |
+| `/gov` | 政府只读治理大屏（口径/快照/范围元数据，无写按钮） | `GET /api/v1/gov/summary` |
+| `/platform` | 平台管理（租户/账号/启停/重置密码） | `/api/v1/admin/**` |
+| `/change-password` | 首次登录强制改密 | `POST /api/v1/auth/password/change` |
 
 ## 已交付模块
 

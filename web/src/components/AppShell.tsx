@@ -5,8 +5,12 @@ import { usePathname } from 'next/navigation';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { Providers } from './Providers';
+import { SessionGuard } from './SessionGuard';
 
-/** 全局壳：左侧深色导航 + 右侧顶栏/内容区 */
+/** 无导航壳的独立页面（登录 / 首次改密） */
+const BARE_PATHS = ['/login', '/change-password'];
+
+/** 全局壳：左侧深色导航 + 右侧顶栏/内容区（含路由级会话守卫） */
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -24,35 +28,38 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [menuOpen]);
 
-  // 登录页全屏独立，不渲染导航壳
-  if (pathname === '/login') {
+  // 登录/改密页全屏独立，不渲染导航壳
+  if (BARE_PATHS.includes(pathname)) {
     return <Providers>{children}</Providers>;
   }
 
   return (
     <Providers>
-      <div className="flex h-dvh overflow-hidden bg-[var(--canvas)]">
-        <div className="hidden lg:block"><Sidebar /></div>
-        {menuOpen && (
-          <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="主导航">
-            <button
-              type="button"
-              className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]"
-              onClick={() => { setMenuOpen(false); menuButtonRef.current?.focus(); }}
-              aria-label="关闭导航"
-            />
-            <div className="relative h-full w-[244px] max-w-[84vw] animate-fade-in">
-              <Sidebar mobile onNavigate={() => { setMenuOpen(false); menuButtonRef.current?.focus(); }} />
+      <SessionGuard>
+        <div className="flex h-dvh overflow-hidden bg-[var(--canvas)]">
+          <div className="hidden lg:block"><Sidebar /></div>
+          {menuOpen && (
+            <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="主导航">
+              <button
+                type="button"
+                className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]"
+                onClick={() => { setMenuOpen(false); menuButtonRef.current?.focus(); }}
+                aria-label="关闭导航"
+              />
+              <div className="relative h-full w-[244px] max-w-[84vw] animate-fade-in">
+                <Sidebar mobile onNavigate={() => { setMenuOpen(false); menuButtonRef.current?.focus(); }} />
+              </div>
             </div>
+          )}
+          <div className="flex min-w-0 flex-1 flex-col">
+            <TopBar menuButtonRef={menuButtonRef} onMenuOpen={() => setMenuOpen(true)} />
+            <main className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-4 sm:py-4 lg:px-6 lg:py-6">
+              <div className="page-container">{children}</div>
+            </main>
           </div>
-        )}
-        <div className="flex min-w-0 flex-1 flex-col">
-          <TopBar menuButtonRef={menuButtonRef} onMenuOpen={() => setMenuOpen(true)} />
-          <main className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-4 sm:py-4 lg:px-6 lg:py-6">
-            <div className="page-container">{children}</div>
-          </main>
         </div>
-      </div>
+      </SessionGuard>
     </Providers>
   );
 }
+

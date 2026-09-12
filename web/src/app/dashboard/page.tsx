@@ -19,6 +19,7 @@ import { MetricCard } from '@/components/dashboard/MetricCard';
 import { TrendChart } from '@/components/dashboard/TrendChart';
 import { SalesShareChart } from '@/components/dashboard/SalesShareChart';
 import { RealtimeFeed } from '@/components/dashboard/RealtimeFeed';
+import { SIMULATED_REALTIME_FEED } from '@/lib/config';
 import { fetchDashboardSummary } from '@/lib/http';
 import { formatDate, formatInt, formatYuan } from '@/lib/format';
 import type { SalesShareItem, TrendPoint } from '@/lib/demo';
@@ -130,16 +131,18 @@ export default function DashboardPage() {
           <SalesShareChart data={salesShare} height={210} />
         </Card>
 
-        {/* 实时流水（Redis Streams 消费语义的客户端演示，非经营数据） */}
-        <Card
-          className="col-span-12 md:col-span-6 xl:col-span-12"
-          icon={<Radio size={16} />}
-          title="Redis Streams · 订单异步消费实时流水"
-          subtitle="出库就绪 / 拣货派单 / 削峰写流动态滚动 · 客户端语义模拟"
-          bodyClassName="p-0"
-        >
-          <RealtimeFeed baseline={FEED_TPS} onStats={handleFeedStats} />
-        </Card>
+        {/* 事件流水：仅当显式开启模拟才展示（生产默认隐藏，避免把模拟标为“实时”） */}
+        {SIMULATED_REALTIME_FEED ? (
+          <Card
+            className="col-span-12 md:col-span-6 xl:col-span-12"
+            icon={<Radio size={16} />}
+            title="事件流水（演示：客户端模拟，非生产实时）"
+            subtitle="未接入后端 SSE/WebSocket 事件流前，本卡片仅为交互演示，不代表真实经营流水"
+            bodyClassName="p-0"
+          >
+            <RealtimeFeed baseline={FEED_TPS} onStats={handleFeedStats} />
+          </Card>
+        ) : null}
       </div>
     </div>
   );

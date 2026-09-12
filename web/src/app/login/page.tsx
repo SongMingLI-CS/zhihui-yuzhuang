@@ -6,7 +6,7 @@ import { Loader2, LogIn, ShieldCheck, Wheat } from 'lucide-react';
 import { login, setAccessToken, toApiError } from '@/lib/http';
 import { persistUser, setCurrentUser } from '@/lib/auth';
 import { resolveTenant, setTenant } from '@/lib/tenant';
-import { APP_SHORT } from '@/lib/config';
+import { APP_SHORT, resolveRoleHome } from '@/lib/config';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,12 +22,18 @@ export default function LoginPage() {
     setBusy(true);
     try {
       const res = await login({ username: username.trim(), password });
+      // 令牌仅在内存保存；会话主体依托服务端下发的 HttpOnly Cookie
       setAccessToken(res.token);
       persistUser(res.user);
       setCurrentUser(res.user);
       // 受保护端点租户取 JWT tenantId：登录后租户选择器应锁定为账号所属租户
       setTenant(resolveTenant(res.user.tenantId));
-      router.replace('/dashboard');
+      if (res.mustChangePassword) {
+        router.replace('/change-password');
+        return;
+      }
+      // 角色分区落地：商家 / 政府 / 村委 / 平台管理员各入其首页
+      router.replace(resolveRoleHome(res.user.role));
     } catch (err) {
       setError(toApiError(err).message);
       setBusy(false);
@@ -97,7 +103,10 @@ export default function LoginPage() {
 
         <div className="mt-4 flex items-start gap-2 rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-2.5 text-[11px] leading-relaxed text-slate-400">
           <ShieldCheck size={14} className="mt-0.5 shrink-0 text-brand-500" />
-          <p>演示账号：admin / admin123（村委）· coop001 / coop123（合作社）· farmer001 / farmer123（农户）</p>
+          <p>
+            账号由平台管理员发放，首次登录需修改初始密码。政府端、商家端与村委端按角色分区进入；
+            请勿共享账号。
+          </p>
         </div>
       </div>
     </main>

@@ -1,9 +1,12 @@
 import axios, { type AxiosResponse } from 'axios';
-import { AI_BASE, API_BASE, AI_STREAMING_ENABLED, TENANT_ID } from '../config';
+import { AI_BASE, API_BASE, AI_STREAMING_ENABLED, ORDER_CREDENTIALS_KEY, TENANT_ID } from '../config';
 import type {
   AgriQARequest,
   AgriQAResponse,
   ApiResponse,
+  GuestOrderCancelRequest,
+  GuestOrderLookupRequest,
+  GuestOrderLookupResponse,
   OrderCheckoutRequest,
   OrderCheckoutResponse,
   Product,
@@ -91,6 +94,80 @@ export async function checkoutOrder(
       headers: { 'X-Idempotency-Key': idempotencyKey },
       timeout: 20000,
     },
+  );
+  return unwrap(res);
+}
+
+/* ===================== 本人订单查询/取消（匿名，凭证鉴权） ===================== */
+
+/**
+ * 本地保存下单返回的查询凭证（仅存订单号与凭证，不含任何个人敏感信息）。
+ *
+ * 凭证只用于本人订单查询/取消；服务端仅保存其 PBKDF2 哈希，无法反查。
+ */
+export function saveOrderCredential(orderNo: string, queryToken?: string | null): void {
+  if (!orderNo || !queryToken || typeof window === 'undefined') return;
+  try {
+    const raw = window.localStorage.getItem(ORDER_CREDENTIALS_KEY);
+    const map = raw ? (JSON.parse(raw) as Record<string, string>) : {};
+    map[orderNo] = queryToken;
+    // 仅保留最近 20 笔，避免本地无限增长
+    const entries = Object.entries(map).slice(-20);
+    window.localStorage.setItem(ORDER_CREDENTIALS_KEY, JSON.stringify(Object.fromEntries(entries)));
+  } catch {
+    // 本地存储不可用（隐私模式）时静默降级，用户仍可手动输入凭证
+  }
+}
+
+/** 读取本地已保存的订单凭证（订单号 → 凭证，倒序）。 */
+export function listOrderCredentials(): Array<{ orderNo: string; queryToken: string }> {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(ORDER_CREDENTIALS_KEY);
+    if (!raw) return [];
+    const map = JSON.parse(raw) as Record<string, string>;
+    return Object.entries(map)
+      .map(([orderNo, queryToken]) => ({ orderNo, queryToken }))
+      .reverse();
+  } catch {
+    return [];
+  }
+}
+
+/** 删除本地保存的订单凭证（如用户清理记录）。 */
+export function removeOrderCredential(orderNo: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = window.localStorage.getItem(ORDER_CREDENTIALS_KEY);
+    if (!raw) return;
+    const map = JSON.parse(raw) as Record<string, string>;
+    delete map[orderNo];
+    window.localStorage.setItem(ORDER_CREDENTIALS_KEY, JSON.stringify(map));
+  } catch {
+    // ignore
+  }
+}
+
+/** 本人订单查询（需订单号 + 一次性查询凭证；返回脱敏状态）。 */
+export async function lookupGuestOrder(
+  payload: GuestOrderLookupRequest,
+): Promise<GuestOrderLookupResponse> {
+  const res = await http.post<ApiResponse<GuestOrderLookupResponse>>(
+    `${API_BASE}/orders/guest/lookup`,
+    payload,
+    { timeout: 15000 },
+  );
+  return unwrap(res);
+}
+
+/** 本人取消未支付订单（需订单号 + 查询凭证；服务端含库存回补）。 */
+export async function cancelGuestOrder(
+  payload: GuestOrderCancelRequest,
+): Promise<GuestOrderLookupResponse> {
+  const res = await http.post<ApiResponse<GuestOrderLookupResponse>>(
+    `${API_BASE}/orders/guest/cancel`,
+    payload,
+    { timeout: 15000 },
   );
   return unwrap(res);
 }

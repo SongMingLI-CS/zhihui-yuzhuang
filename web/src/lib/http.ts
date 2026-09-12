@@ -1,5 +1,5 @@
 import axios, { type AxiosResponse } from 'axios';
-import { AI_BASE, API_BASE, AI_QA_TIMEOUT, AI_MARKETING_TIMEOUT, AI_STREAMING_ENABLED, GATEWAY_BASE } from './config';
+import { AI_BASE, API_BASE, AI_QA_TIMEOUT, AI_MARKETING_TIMEOUT, AI_STREAMING_ENABLED, BASE_PATH, GATEWAY_BASE } from './config';
 import { getTenant } from './tenant';
 import { persistUser, setCurrentUser } from './auth';
 import type {
@@ -19,6 +19,14 @@ import type {
   KnowledgeDocMeta,
   KnowledgeDeleteResult,
   KnowledgeUploadResult,
+  UserInfo,
+  MerchantProductParams,
+  GovSummary,
+  AdminTenant,
+  AdminUser,
+  MarketingTaskPage,
+  MarketingTaskItem,
+  MarketingReviewStatus,
 } from './types';
 
 /** 业务/网络错误统一封装（携带契约 code 与 HTTP 状态） */
@@ -34,31 +42,49 @@ export class ApiError extends Error {
   }
 }
 
-/** 与 h5 同源请求实例：全量注入当前多租户标识 X-Tenant-Id */
-const http = axios.create({ timeout: 30_000 });
+/** 与 h5 同源请求实例：Cookie 会话（withCredentials）+ 双提交 CSRF + 兼容 Bearer。 */
+const http = axios.create({ timeout: 30_000, withCredentials: true });
 
-const ACCESS_TOKEN_KEY = 'yuzhuang.access_token';
+/** 兼容历史 key：仅在登出时清理旧 localStorage 令牌（阶段 A 起不再写入 localStorage）。 */
+const LEGACY_TOKEN_KEY = 'yuzhuang.access_token';
+
+/** 令牌仅保存在内存（页面刷新后依赖 HttpOnly 会话 Cookie 恢复），避免 XSS 窃取长期令牌。 */
+let accessToken: string | null = null;
 
 export function setAccessToken(token: string | null): void {
-  if (typeof window === 'undefined') return;
-  if (token) window.localStorage.setItem(ACCESS_TOKEN_KEY, token);
-  else window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+  accessToken = token;
+  if (typeof window !== 'undefined') {
+    // 清理历史版本遗留的 localStorage 令牌
+    window.localStorage.removeItem(LEGACY_TOKEN_KEY);
+  }
 }
 
-function getAccessToken(): string | null {
-  return typeof window === 'undefined' ? null : window.localStorage.getItem(ACCESS_TOKEN_KEY);
+export function getAccessToken(): string | null {
+  return accessToken;
+}
+
+/** 读取 CSRF 双提交 Cookie（非 HttpOnly，服务端写入）。 */
+export function readCsrfCookie(): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.split('; ').find((row) => row.startsWith('yz_csrf='));
+  return match ? decodeURIComponent(match.split('=').slice(1).join('=')) : null;
 }
 
 http.interceptors.request.use((config) => {
   config.headers.set('X-Tenant-Id', getTenant().id);
-  const token = getAccessToken();
-  if (token) config.headers.set('Authorization', `Bearer ${token}`);
+  if (accessToken) config.headers.set('Authorization', `Bearer ${accessToken}`);
+  const method = (config.method ?? 'get').toUpperCase();
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+    const csrf = readCsrfCookie();
+    if (csrf) config.headers.set('X-CSRF-Token', csrf);
+  }
   return config;
 });
 
 /**
  * 401 兜底：B 端受保护端点返回 A1002（未登录/令牌失效）时清空本地会话并回登录页。
  * 登录接口自身的 401（密码错误）与健康探针（validateStatus 全放行）不受影响。
+ * 跳转路径按 basePath 拼接（修复历史忽略 `/b` 前缀的问题）。
  */
 http.interceptors.response.use(undefined, (error) => {
   const status = error?.response?.status as number | undefined;
@@ -74,8 +100,9 @@ http.interceptors.response.use(undefined, (error) => {
     setAccessToken(null);
     persistUser(null);
     setCurrentUser(null);
-    if (!window.location.pathname.startsWith('/login')) {
-      window.location.assign('/login');
+    const loginPath = `${BASE_PATH}/login`;
+    if (!window.location.pathname.startsWith(loginPath)) {
+      window.location.assign(loginPath);
     }
   }
   return Promise.reject(error);
@@ -112,6 +139,25 @@ export function toApiError(err: unknown): ApiError {
 export async function login(payload: AuthLoginRequest): Promise<AuthLoginResponse> {
   const res = await http.post<ApiResponse<AuthLoginResponse>>(`${API_BASE}/auth/login`, payload);
   return unwrap(res);
+}
+
+/** 查询当前会话账号（页面刷新后凭 HttpOnly Cookie 恢复登录态）。 */
+export async function fetchMe(): Promise<UserInfo> {
+  const res = await http.get<ApiResponse<UserInfo>>(`${API_BASE}/auth/me`);
+  return unwrap(res);
+}
+
+/** 登出：服务端清除会话 Cookie。 */
+export async function logout(): Promise<void> {
+  await http.post<ApiResponse<{ loggedOut: boolean }>>(`${API_BASE}/auth/logout`);
+}
+
+/** 修改密码（首次登录强制改密）。 */
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  await http.post<ApiResponse<{ changed: boolean }>>(`${API_BASE}/auth/password/change`, {
+    currentPassword,
+    newPassword,
+  });
 }
 
 /* ===================== 经营大盘（GET /api/v1/dashboard/summary） ===================== */
@@ -228,7 +274,7 @@ export async function askAgriStreaming(payload: AgriQARequest, callbacks: Stream
   }
   const token = getAccessToken();
   const response = await fetch(`${AI_BASE}/qa/ask/stream`, {
-    method: 'POST', signal: callbacks.signal,
+    method: 'POST', signal: callbacks.signal, credentials: 'include',
     headers: { 'Content-Type': 'application/json', 'X-Tenant-Id': getTenant().id, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: JSON.stringify(payload),
   });
@@ -267,7 +313,96 @@ export async function generateMarketing(
   return unwrap(res);
 }
 
-/* ===================== 链路健康探针（顶栏链路状态指示器） ===================== */
+
+/* ===================== 商家工作台（GET /api/v1/merchant/products） ===================== */
+
+/** 分页查询本租户商品（含草稿/在售/下架/归档；数据域取自 JWT 主体）。 */
+export async function listMerchantProducts(
+  params: MerchantProductParams = {},
+): Promise<PageResult<Product>> {
+  const res = await http.get<ApiResponse<PageResult<Product>>>(`${API_BASE}/merchant/products`, {
+    params,
+  });
+  return unwrap(res);
+}
+
+/* ===================== 政府治理（GET /api/v1/gov/summary） ===================== */
+
+/** 授权范围只读聚合（含快照时间、范围与统计口径元数据）。 */
+export async function fetchGovSummary(): Promise<GovSummary> {
+  const res = await http.get<ApiResponse<GovSummary>>(`${API_BASE}/gov/summary`);
+  return unwrap(res);
+}
+
+/* ===================== 平台管理（GET /api/v1/admin/*） ===================== */
+
+export async function listAdminTenants(): Promise<AdminTenant[]> {
+  const res = await http.get<ApiResponse<AdminTenant[]>>(`${API_BASE}/admin/tenants`);
+  return unwrap(res);
+}
+
+export async function listAdminUsers(tenantId?: string): Promise<AdminUser[]> {
+  const res = await http.get<ApiResponse<AdminUser[]>>(`${API_BASE}/admin/users`, {
+    params: tenantId ? { tenantId } : {},
+  });
+  return unwrap(res);
+}
+
+/** 启用/停用账号（PLATFORM_ADMIN）。 */
+export async function updateAdminUserStatus(
+  userId: number,
+  status: 'ACTIVE' | 'DISABLED',
+  reason?: string,
+): Promise<AdminUser> {
+  const res = await http.patch<ApiResponse<AdminUser>>(
+    `${API_BASE}/admin/users/${userId}/status`,
+    { status, reason },
+  );
+  return unwrap(res);
+}
+
+/** 重置账号密码，返回一次性临时口令（服务端要求首次改密）。 */
+export async function resetAdminUserPassword(userId: number): Promise<{
+  username: string;
+  temporaryPassword: string;
+  mustChangePassword: boolean;
+}> {
+  const res = await http.post<
+    ApiResponse<{ username: string; temporaryPassword: string; mustChangePassword: boolean }>
+  >(`${API_BASE}/admin/users/${userId}/password/reset`);
+  return unwrap(res);
+}
+
+/* ===================== 营销任务台账与审批（/ai/v1/marketing/tasks） ===================== */
+
+/** 分页查询本租户营销任务台账（含审批状态/审批人/发布时间）。 */
+export async function listMarketingTasks(
+  params: { status?: MarketingReviewStatus; page?: number; pageSize?: number } = {},
+): Promise<MarketingTaskPage> {
+  const res = await http.get<ApiResponse<MarketingTaskPage>>(`${AI_BASE}/marketing/tasks`, {
+    params: {
+      status: params.status,
+      page: params.page ?? 1,
+      page_size: params.pageSize ?? 20,
+    },
+  });
+  return unwrap(res);
+}
+
+/** 审批/发布动作：approve / reject / publish（严格服务端状态机）。 */
+export async function marketingTaskAction(
+  taskId: number,
+  action: 'approve' | 'reject' | 'publish',
+  comment = '',
+): Promise<MarketingTaskItem> {
+  const res = await http.post<ApiResponse<MarketingTaskItem>>(
+    `${AI_BASE}/marketing/tasks/${taskId}/${action}`,
+    { comment },
+  );
+  return unwrap(res);
+}
+
+
 
 async function probeOk(url: string, timeoutMs = 6_000): Promise<boolean> {
   try {

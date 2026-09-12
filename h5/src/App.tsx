@@ -9,7 +9,9 @@ import type { SuccessData } from './components/OrderSuccessModal';
 import Providers from './components/Providers';
 import OfflineNotice from './components/OfflineNotice';
 import type { OrderCheckoutResponse, Product } from './types/api';
-import { fetchProducts, toApiError } from './lib/http';
+import { fetchProducts, saveOrderCredential, toApiError } from './lib/http';
+import OrderCenter from './components/OrderCenter';
+import { DEMO_MODE } from './config';
 
 const CheckoutDrawer = lazy(() => import('./components/CheckoutDrawer'));
 const OrderSuccessModal = lazy(() => import('./components/OrderSuccessModal'));
@@ -29,6 +31,8 @@ function ShopPage() {
 
   const handleOrderSuccess = (resp: OrderCheckoutResponse) => {
     if (buyTarget) setSuccess({ resp, product: buyTarget });
+    // 保存本人订单查询凭证（仅订单号 + 一次性凭证，便于订单中心查询/取消）
+    saveOrderCredential(resp.orderNo, resp.queryToken);
     setBuyTarget(null);
     reload(); // 下单后刷新实时库存
   };
@@ -129,16 +133,47 @@ function ShopPage() {
         </section>
       </main>
 
+      {/* 订单中心：本人订单查询 / 物流 / 取消（订单号 + 查询凭证） */}
+      <OrderCenter />
+
       <footer className="mx-auto w-full max-w-[430px] px-4 pb-10">
-        <div className="mt-2 flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
+        <div className="mt-6 flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
           <Wheat size={12} className="text-green-500" />
           智汇于庄 · 特色产业数字助农 · 让乡村好物直达城市
         </div>
-        <p className="mt-2 text-center text-[10px] leading-relaxed text-slate-300">
-          演示环境 · 商品与订单数据仅供乡村振兴竞赛演示
+        <p className="mt-2 text-center text-[10px] leading-relaxed text-slate-400">
+          {DEMO_MODE
+            ? '演示模式 · 商品与订单数据用于功能演示，请勿作为真实交易依据'
+            : '商品与订单数据来自平台数据库；请勿在公开场合泄露订单查询凭证'}
           <br />
           本页面经由统一网关 /h5/ 反向代理至 h5 服务
         </p>
+
+        <details className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
+          <summary className="cursor-pointer text-[11px] font-medium text-slate-600">
+            隐私政策与用户协议
+          </summary>
+          <div className="mt-2 space-y-2 text-[10px] leading-relaxed text-slate-500">
+            <p>
+              <b className="text-slate-600">收货信息处理说明：</b>
+              下单所需的收货人姓名、手机号与收货地址仅用于订单履约与物流配送，
+              存储于平台业务数据库；页面与日志不会展示完整手机号与详细门牌，
+              订单查询接口返回的内容均已脱敏（如 138****0000、河南省…县…镇…）。
+            </p>
+            <p>
+              <b className="text-slate-600">订单查询凭证：</b>
+              下单成功后系统会下发一次性查询凭证（queryToken），仅保存在您的浏览器本机，
+              用于本人订单查询与取消。凭证在服务端以不可逆哈希保存，
+              遗失后无法找回，也不会通过短信/邮件自动发送。
+            </p>
+            <p>
+              <b className="text-slate-600">用户协议（要点）：</b>
+              本平台提供的农技问答与政策解读内容基于知识库检索，仅供参考，
+              不构成官方技术指导或法律意见；支付与发票以实际渠道凭证为准。
+              禁止使用平台从事虚假交易、刷单或其他违法违规行为。
+            </p>
+          </div>
+        </details>
       </footer>
         </div>
       </div>

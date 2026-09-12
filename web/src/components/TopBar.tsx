@@ -10,9 +10,9 @@ import { DEFAULT_TENANT, getTenant, resolveTenant, setTenant, subscribeTenant, T
 import { useLinkHealth, type LinkHealth } from '@/lib/useLinkHealth';
 import { formatTime } from '@/lib/format';
 import { getStoredUser, persistUser, setCurrentUser, subscribeAuth } from '@/lib/auth';
-import { setAccessToken } from '@/lib/http';
+import { setAccessToken, logout as apiLogout } from '@/lib/http';
 import type { UserInfo } from '@/lib/types';
-import { NAV_ITEMS } from './navItems';
+import { navItemsForRole } from './navItems';
 
 const LINK_META: Array<{ key: keyof LinkHealth; label: string }> = [
   { key: 'gateway', label: '网关' },
@@ -84,16 +84,23 @@ export function TopBar({ onMenuOpen, menuButtonRef }: { onMenuOpen: () => void; 
   }, [pickerOpen]);
 
   const active = useMemo(() => {
-    const item = NAV_ITEMS.find((n) => n.href === pathname);
-    return item ?? NAV_ITEMS[0];
-  }, [pathname]);
+    const items = navItemsForRole(user?.role);
+    const item = items.find((n) => n.href === pathname);
+    return item ?? items[0] ?? navItemsForRole(undefined)[0];
+  }, [pathname, user?.role]);
 
   const chooseTenant = (t: TenantInfo) => {
     setTenant(t);
     setPickerOpen(false);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      // 服务端清除会话 Cookie（HttpOnly）
+      await apiLogout();
+    } catch {
+      // 登出接口失败不阻断前端清理
+    }
     setAccessToken(null);
     persistUser(null);
     setCurrentUser(null);

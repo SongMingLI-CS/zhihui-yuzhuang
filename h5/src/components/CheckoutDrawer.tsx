@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { MapPin, RefreshCw, ShieldCheck, Truck, X, Zap } from 'lucide-react';
 import type { OrderCheckoutResponse, Product } from '../types/api';
 import { checkoutOrder, toApiError } from '../lib/http';
-import { DEMO_RECEIVER, ORDER_SOURCE } from '../config';
+import { DEMO_MODE, DEMO_RECEIVER, ORDER_SOURCE } from '../config';
 import { useToast } from './Toast';
 import { Price } from './ProductCard';
 import ProductVisual from './ProductVisual';
@@ -174,14 +174,16 @@ export default function CheckoutDrawer({
           <div>
             <div className="flex items-center justify-between">
               <label htmlFor="receiver-name" className="mb-1 block text-[12px] font-semibold text-slate-600">收货人 <span className="text-red-500">*</span></label>
-              <button
-                type="button"
-                onClick={fillDemo}
-                className="flex items-center gap-1 rounded-md bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-700 ring-1 ring-green-200 active:scale-95"
-              >
-                <RefreshCw size={10} />
-                一键填入演示于庄地址
-              </button>
+              {DEMO_MODE && (
+                <button
+                  type="button"
+                  onClick={fillDemo}
+                  className="flex items-center gap-1 rounded-md bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-700 ring-1 ring-green-200 active:scale-95"
+                >
+                  <RefreshCw size={10} />
+                  一键填入演示于庄地址
+                </button>
+              )}
             </div>
             <input
               ref={nameRef}

@@ -1,14 +1,25 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ArrowUpRight, Wheat } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { APP_SHORT } from '@/lib/config';
-import { NAV_ITEMS } from './navItems';
+import { getStoredUser, subscribeAuth } from '@/lib/auth';
+import type { UserInfo } from '@/lib/types';
+import { navItemsForRole } from './navItems';
 
 export function Sidebar({ mobile = false, onNavigate }: { mobile?: boolean; onNavigate?: () => void }) {
   const pathname = usePathname();
+  const [user, setUser] = useState<UserInfo | null>(null);
+
+  useEffect(() => {
+    setUser(getStoredUser());
+    return subscribeAuth((u) => setUser(u));
+  }, []);
+
+  const items = navItemsForRole(user?.role);
 
   return (
     <aside data-mobile={mobile || undefined} className="flex h-dvh w-[244px] shrink-0 flex-col bg-[#163b2a] text-brand-100 shadow-[12px_0_36px_rgba(16,45,31,.08)]">
@@ -25,12 +36,12 @@ export function Sidebar({ mobile = false, onNavigate }: { mobile?: boolean; onNa
         </div>
       </div>
 
-      {/* 导航 */}
+      {/* 导航（按角色过滤；服务端仍强校验） */}
       <nav className="flex-1 space-y-1 px-3" aria-label="运营指挥">
         <p className="px-2 pb-1 text-[10px] font-medium uppercase tracking-wider text-brand-200">
           运营指挥
         </p>
-        {NAV_ITEMS.map((item) => {
+        {items.map((item) => {
           const active = pathname === item.href;
           const Icon = item.icon;
           return (
@@ -57,8 +68,9 @@ export function Sidebar({ mobile = false, onNavigate }: { mobile?: boolean; onNa
       {/* 底部说明 */}
       <div className="border-t border-white/10 px-5 py-4 text-[11px] leading-relaxed text-brand-300">
         <p className="font-medium text-brand-100">于庄数字助农示范平台</p>
-        <p className="mt-1 flex items-center gap-1 text-brand-200">演示环境 · 数据仅作项目展示 <ArrowUpRight size={11} /></p>
+        <p className="mt-1 flex items-center gap-1 text-brand-200">数据来自平台数据库 · 按角色授权 <ArrowUpRight size={11} /></p>
       </div>
     </aside>
   );
 }
+

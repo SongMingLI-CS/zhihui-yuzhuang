@@ -25,6 +25,12 @@ export interface Product {
   tenantId: string;
   description: string;
   imageUrl: string;
+  /** 阶段 C 扩展：分类 / 单位 / 产地 / 详情 / 库存预警阈值 */
+  category?: string | null;
+  unit?: string | null;
+  origin?: string | null;
+  detail?: string | null;
+  stockAlert?: number | null;
 }
 
 /* ===================== 特产下单（POST /api/v1/orders/checkout） ===================== */
@@ -55,6 +61,41 @@ export interface OrderCheckoutResponse {
   totalAmount: number;
   status: string;
   expireTime: number | null;
+  /**
+   * 本人订单查询凭证（仅下单响应返回一次）。
+   *
+   * 订单中心用它查询/取消订单；仅凭订单号无法读取订单（服务端 PBKDF2 校验）。
+   */
+  queryToken?: string | null;
+}
+
+/* ===================== 本人订单查询（匿名，凭证鉴权） ===================== */
+
+export interface GuestOrderLookupRequest {
+  orderNo: string;
+  queryToken: string;
+}
+
+export interface GuestOrderCancelRequest {
+  orderNo: string;
+  queryToken: string;
+  reason?: string;
+}
+
+/** 已脱敏的订单状态（不含完整手机号/地址） */
+export interface GuestOrderLookupResponse {
+  orderNo: string;
+  status: string | null;
+  fulfillmentStatus: string | null;
+  totalAmount: number;
+  recipientNameMasked: string;
+  recipientPhoneMasked: string;
+  addressMasked: string;
+  carrier?: string | null;
+  trackingNo?: string | null;
+  shippedAt?: number | null;
+  cancelReason?: string | null;
+  createdAt?: number | null;
 }
 
 /* ===================== 农技问答（POST /ai/v1/qa/ask） ===================== */

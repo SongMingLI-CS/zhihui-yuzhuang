@@ -12,6 +12,37 @@ export const AI_STREAMING_ENABLED = process.env.NEXT_PUBLIC_AI_STREAMING_ENABLED
 /** 网关原生存活探针（根路径 /healthz），开发环境可留空由当前源承载 */
 export const GATEWAY_BASE = process.env.NEXT_PUBLIC_GATEWAY_BASE ?? '';
 
+/**
+ * 应用 basePath（与 next.config.mjs 的 basePath 保持一致）。
+ * 用途：非组件环境（axios 拦截器）无法使用 next/navigation，需按 basePath 拼接登录跳转，
+ * 修复历史 `window.location.assign('/login')` 忽略 `/b` 前缀导致 404 的问题。
+ */
+export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? '/b';
+
+/** 角色 → 登录后落地页（政府/商家/村委/平台分区，服务端仍需强校验） */
+export const ROLE_HOME: Record<string, string> = {
+  PLATFORM_ADMIN: '/platform',
+  GOVERNMENT: '/gov',
+  VILLAGE: '/dashboard',
+  COOPERATIVE: '/merchant',
+  CONSUMER: '/dashboard',
+};
+
+export const resolveRoleHome = (role: string | undefined | null): string => {
+  if (!role) return '/login';
+  return ROLE_HOME[role] ?? '/dashboard';
+};
+
+/**
+ * 是否展示“事件流水”演示卡片。
+ *
+ * 后端尚未提供经鉴权的 SSE/WebSocket 事件流，该卡片为**客户端模拟**；
+ * 因此默认关闭（生产隐藏），需显式 `NEXT_PUBLIC_SIMULATED_REALTIME_FEED=true` 才展示，
+ * 且卡片标题明确标注“演示：非生产实时”，不得被当作实时经营数据。
+ */
+export const SIMULATED_REALTIME_FEED =
+  process.env.NEXT_PUBLIC_SIMULATED_REALTIME_FEED === 'true';
+
 export const APP_TITLE = '智汇于庄 · 数字产业中台与治理大脑';
 export const APP_SHORT = '智汇于庄';
 
