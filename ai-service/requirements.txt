@@ -4,6 +4,11 @@
 # --- Web 框架 ---
 fastapi>=0.115.0,<1.0.0
 uvicorn[standard]>=0.32.0,<1.0.0
+# multipart 表单解析：app/api/knowledge.py 的 /knowledge/docs/upload 使用 File/Form，
+# 该依赖由 FastAPI 内部按需加载（项目代码不直接 import，故易漏）。
+# FastAPI>=0.115 在【注册含 Form/File 的路由】时即强制校验，缺失会导致应用启动即失败：
+#   RuntimeError: Form data requires "python-multipart" to be installed.
+python-multipart>=0.0.9,<1.0.0
 
 # --- 数据校验 / 配置 ---
 pydantic>=2.9.0,<3.0.0
