@@ -50,3 +50,7 @@ mobile/pubspec.lock
 # ===== 数据库/本地数据 =====
 *.sqlite3
 *.dump
+
+# ===== 部署包（构建产物，不入库） =====
+*-deploy-*.tar.gz
+yuzhuang-deploy.tar.gz

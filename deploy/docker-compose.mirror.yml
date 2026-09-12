@@ -1,0 +1,23 @@
+# ============================================================
+# 智汇于庄 · 构建加速叠加层（可选；国内云主机专用）
+#
+# 用法（与主编排叠加；Docker Compose 支持多个 -f）：
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.mirror.yml up -d --build
+# 或经部署脚本：
+#   EXTRA_COMPOSE_FILES=deploy/docker-compose.mirror.yml bash deploy/remote-deploy.sh
+#
+# 为什么需要它（实测 @ 腾讯云北京轻量应用服务器 4C / 3.6G）：
+#   deb.debian.org               32 KB/s   →  mirrors.cloud.tencent.com  18.9 MB/s
+#   pypi.org                     49 KB/s   →  mirrors.cloud.tencent.com   856 KB/s
+#   其余源（npm / Maven Central）在该实例上约 0.6 MB/s，无需加速。
+#
+# 影响面：仅把 ai-service 的 Dockerfile 换成 deploy/dockerfiles/ai-service.Dockerfile
+#        （apt/pip 走腾讯云镜像 + 失败自动回退官方源）。构建上下文与镜像名不变，
+#        ai-service/ 模块本身零改动，其他服务完全不受影响。
+# ============================================================
+
+services:
+  ai-service:
+    build:
+      context: ../ai-service
+      dockerfile: ../deploy/dockerfiles/ai-service.Dockerfile
