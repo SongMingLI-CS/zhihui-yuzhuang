@@ -3,6 +3,28 @@
 > 本文档描述《智汇于庄：基于大模型与高并发引擎的特色产业数字助农中台》的总体技术架构，
 > 是后续各模块（backend / ai-service / web / h5 / mobile）设计与实现的总纲。
 
+> **2026-09-12 整改：角色分区与演示/生产边界**
+
+```text
+Nginx 网关（生产：TLS + 安全头 + 登录/下单/AI/上传限流；文档仅内网）
+├─ /h5/*            C 端消费者（Vite React，轻量移动优先）
+├─ /b/merchant/*    COOPERATIVE 商家工作台（商品/订单/履约/营销）
+├─ /b/dashboard/*   VILLAGE 村委治理大盘
+├─ /b/gov/*         GOVERNMENT 政府只读治理大屏（按 t_gov_scope 授权范围聚合）
+├─ /b/platform/*    PLATFORM_ADMIN 平台管理（租户/账号/授权范围/启停/重置）
+├─ /api/v1/*        Spring Boot（认证/租户/商品/订单/治理聚合/审计）
+└─ /ai/v1/*         FastAPI（RAG / 营销；与后端同密钥 JWT 鉴权）
+PostgreSQL(+pgvector) · Redis Streams · S3 兼容对象存储（配置化）
+```
+
+要点：
+
+1. 权限与数据范围由**服务端**依据已验证主体（`yz_session` Cookie / Bearer JWT）与政府授权范围推导；
+   `X-Tenant-Id` 仅用于匿名公开浏览/受控店铺解析，不再是受保护端点的租户来源。
+2. `APP_ENV=production` 时不创建演示账号、不灌演示数据、拒绝弱密钥（`ProductionSafetyValidator` fail-fast）。
+3. 端点级权限策略见 `web/security/EndpointSecurityPolicy`，未声明的 `/api/v1/**` 默认要求认证。
+
+
 ## 1. 设计目标与原则
 
 | 目标 | 说明 |

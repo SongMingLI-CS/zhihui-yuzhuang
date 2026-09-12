@@ -1,0 +1,175 @@
+# ============================================================
+# 智汇于庄 · 生产编排（阶段 A P0-3 / 验收项 13）
+#
+# 与 deploy/docker-compose.yml（演示/本地）的关键差异：
+#   * PostgreSQL / Redis 不映射任何宿主机端口（仅内网 rural-network 可达）；
+#   * 仅网关暴露 80/443；80 强制跳 HTTPS；TLS 证书由外部挂载；
+#   * APP_ENV=production、DEMO_MODE=false → backend 启动安全校验 fail-fast，
+#     不会创建演示账号/演示数据，也不允许默认 JWT 密钥；
+#   * AUTH_JWT_SECRET / POSTGRES_PASSWORD 必须由 .env 或 secret 注入（无默认值）；
+#   * 所有服务含 healthcheck。
+#
+# 用法：
+#   cp .env.production.example .env.production   # 填写高熵密钥与域名
+#   docker compose --env-file .env.production -f deploy/docker-compose.prod.yml up -d --build
+# 证书放置（示例）：/etc/letsencrypt/live/<domain>/fullchain.pem 与 privkey.pem
+# ============================================================
+
+services:
+  postgres:
+    image: ankane/pgvector:latest
+    container_name: rural-revitalization-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB 必填}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER 必填}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?生产必须注入高熵 POSTGRES_PASSWORD}
+      TZ: ${TZ:-Asia/Shanghai}
+    # 生产不暴露数据库到宿主机
+    expose:
+      - "5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - rural-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: rural-revitalization-redis
+    restart: always
+    command: ["redis-server", "--appendonly", "yes"]
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+    expose:
+      - "6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - rural-network
+
+  gateway:
+    image: nginx:1.27-alpine
+    container_name: rural-revitalization-gateway
+    restart: always
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    environment:
+      # 官方 nginx 镜像会渲染 /etc/nginx/templates/*.template 中的变量
+      SERVER_NAME: ${SERVER_NAME:?生产必须配置域名 SERVER_NAME}
+      TLS_CERT_PATH: /etc/nginx/certs/fullchain.pem
+      TLS_KEY_PATH: /etc/nginx/certs/privkey.pem
+      NGINX_ENVSUBST_OUTPUT_DIR: /etc/nginx/conf.d
+    volumes:
+      - ./nginx/nginx.prod.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./nginx/proxy-common.inc:/etc/nginx/conf.d/proxy-common.inc:ro
+      - ${TLS_DIR:?必须提供 TLS_DIR 证书目录}:/etc/nginx/certs:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      web:
+        condition: service_started
+    networks:
+      - rural-network
+
+  backend:
+    build:
+      context: ../backend
+    image: yuzhuang-backend:prod
+    container_name: rural-revitalization-backend
+    restart: always
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      # 生产：禁止演示账号/演示灌数/默认密钥（由 ProductionSafetyValidator 强制）
+      APP_ENV: production
+      DEMO_MODE: "false"
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?生产必须注入高熵 AUTH_JWT_SECRET（≥32 字符）}
+      AUTH_JWT_EXPIRE_MINUTES: ${AUTH_JWT_EXPIRE_MINUTES:-120}
+      # 生产 Session Cookie 必须 Secure（HTTPS）
+      AUTH_SESSION_COOKIE_SECURE: "true"
+      AUTH_SESSION_COOKIE_SAME_SITE: Lax
+      AUTH_SESSION_COOKIE_DOMAIN: ${SERVER_NAME}
+      # 不设置 SPRING_SQL_INIT_*：由 Flyway 受控迁移建表，绝不灌演示数据
+      SERVER_PORT: "8080"
+      TZ: ${TZ:-Asia/Shanghai}
+    expose:
+      - "8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - rural-network
+
+  ai-service:
+    build:
+      context: ../ai-service
+    image: yuzhuang-ai-service:prod
+    container_name: rural-revitalization-ai
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      APP_ENV: production
+      DEMO_MODE: "false"
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?生产必须与 backend 使用同一 AUTH_JWT_SECRET}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-https://api.openai.com/v1}
+      TZ: ${TZ:-Asia/Shanghai}
+    expose:
+      - "8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - rural-network
+
+  web:
+    build:
+      context: ../web
+    image: yuzhuang-web:prod
+    container_name: rural-revitalization-web
+    restart: always
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+    expose:
+      - "3000"
+    networks:
+      - rural-network
+
+  h5:
+    build:
+      context: ../h5
+    image: yuzhuang-h5:prod
+    container_name: rural-revitalization-h5
+    restart: always
+    expose:
+      - "80"
+    networks:
+      - rural-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  rural-network:
+    driver: bridge

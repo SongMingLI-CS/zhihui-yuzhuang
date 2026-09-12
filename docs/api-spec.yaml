@@ -609,11 +609,470 @@ paths:
                       data:
                         $ref: '#/components/schemas/KnowledgeDeleteResponse'
 
+  # ============================================================
+  # 阶段 A/B 新增：会话与改密、平台管理、政府治理、商家工作台
+  # ============================================================
+  /auth/logout:
+    post:
+      tags: [认证]
+      summary: 登出（清除会话 Cookie）
+      security: []
+      responses:
+        '200': { description: 登出成功 }
+  /auth/csrf:
+    get:
+      tags: [认证]
+      summary: 获取/刷新 CSRF 令牌（双提交 Cookie）
+      security: []
+      responses:
+        '200': { description: 返回 csrfToken 与 headerName }
+  /auth/me:
+    get:
+      tags: [认证]
+      summary: 当前登录账号信息（会话恢复）
+      responses:
+        '200': { description: 用户信息 }
+        '401': { description: 未登录或登录已过期（A1002） }
+  /auth/password/change:
+    post:
+      tags: [认证]
+      summary: 修改密码（首次登录强制改密；新密码需 ≥8 位且含字母与数字）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string, minLength: 6 }
+                newPassword: { type: string, minLength: 8 }
+      responses:
+        '200': { description: 修改成功 }
+        '401': { description: 当前密码不正确（A1002） }
+        '400': { description: 新密码不符合策略（A1006） }
+  /merchant/products:
+    get:
+      tags: [商家工作台]
+      summary: 分页查询本租户商品（含草稿/在售/下架/归档）
+      description: 需 JWT；角色限 COOPERATIVE/VILLAGE/PLATFORM_ADMIN；数据域取自令牌 tenantId（VILLAGE/PLATFORM_ADMIN 另含 global）。
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [DRAFT, ON_SALE, OFF_SHELF, ARCHIVED] }
+        - in: query
+          name: keyword
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, default: 10, maximum: 100 }
+      responses:
+        '200': { description: 分页结果 }
+        '403': { description: 角色无权（A1003） }
+  /gov/summary:
+    get:
+      tags: [政府治理]
+      summary: 授权范围只读聚合（含快照时间、范围与统计口径元数据）
+      description: 需 JWT；仅 GOVERNMENT（按 t_gov_scope 授权范围）与 PLATFORM_ADMIN；只读且不含 PII。
+      responses:
+        '200': { description: 聚合结果 }
+        '403': { description: 角色无权（A1003） }
+  /gov/scope:
+    get:
+      tags: [政府治理]
+      summary: 查询当前账号的可治理范围
+      responses:
+        '200': { description: 范围元数据（all / tenantIds / description） }
+
+
+  # ============================================================
+  # 阶段 C/E/F 新增：商品扩展资料、库存预警、AI 能力与就绪、知识审核/版本、营销任务审批
+  # ============================================================
+  /products/{id}/profile:
+    put:
+      tags: [商品管理]
+      summary: 更新商品扩展资料（分类/单位/产地/详情/库存预警阈值）
+      description: 需 JWT；作用域同 PUT /products/{id}（本租户，global 目录仅 VILLAGE）；写审计日志。
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                category: { type: string, maxLength: 64 }
+                unit: { type: string, maxLength: 16 }
+                origin: { type: string, maxLength: 128 }
+                detail: { type: string, maxLength: 4000 }
+                stockAlert: { type: integer, minimum: 0 }
+      responses:
+        '200': { description: 返回更新后的商品（含 lowStock 标记） }
+        '404': { description: 商品不存在或跨租户（A1004） }
+  /merchant/products/low-stock:
+    get:
+      tags: [商家工作台]
+      summary: 库存预警列表（stock_alert > 0 且 stock <= stock_alert，且未归档）
+      description: 需 JWT；角色限 COOPERATIVE/VILLAGE/PLATFORM_ADMIN；数据域取令牌 tenantId。
+      responses:
+        '200': { description: 预警商品列表（按库存升序） }
+        '403': { description: 角色无权（A1003） }
+  /ai/v1/livez:
+    get:
+      tags: [AI 服务]
+      summary: AI 服务存活探针（不依赖数据库）
+      security: []
+      servers:
+        - url: /
+      responses:
+        '200': { description: 进程存活 }
+  /ai/v1/readyz:
+    get:
+      tags: [AI 服务]
+      summary: AI 服务就绪探针（数据库 + 真实 Embedding/LLM 能力 + 知识库基础状态）
+      description: 生产未配置真实密钥时返回 503 并在 data 中给出 checks（不含密钥）。
+      security: []
+      responses:
+        '200': { description: 就绪 }
+        '503': { description: 未就绪（A5004，含原因与 checks） }
+  /ai/v1/capabilities:
+    get:
+      tags: [AI 服务]
+      summary: AI 能力状态（是否已配置/真实或降级；不含密钥）
+      description: 需登录（COOPERATIVE/VILLAGE/GOVERNMENT/PLATFORM_ADMIN）；用于确认自配置 API Key 是否生效。
+      responses:
+        '200': { description: LLM/Embedding 配置与模式（REAL/MOCK/UNAVAILABLE） }
+        '401': { description: 未登录（A1002） }
+  /ai/v1/knowledge/docs/review:
+    post:
+      tags: [知识库]
+      summary: 审核知识文档（APPROVED / REJECTED）
+      description: 需 JWT；角色限 VILLAGE/PLATFORM_ADMIN；审核人取已验证身份并留痕。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenantId, title, status]
+              properties:
+                tenantId: { type: string }
+                title: { type: string, maxLength: 255 }
+                status: { type: string, enum: [APPROVED, REJECTED] }
+                comment: { type: string, maxLength: 500 }
+      responses:
+        '200': { description: 审核结果 }
+        '400': { description: 文档不存在或参数错误（A1001） }
+  /ai/v1/knowledge/docs/versions:
+    get:
+      tags: [知识库]
+      summary: 查询知识文档版本历史（含内容哈希/大小/上传者/时间）
+      parameters:
+        - in: query
+          name: title
+          required: true
+          schema: { type: string }
+        - in: query
+          name: tenant_id
+          schema: { type: string }
+      responses:
+        '200': { description: 版本列表（倒序） }
+  /ai/v1/marketing/tasks:
+    get:
+      tags: [营销]
+      summary: 营销任务台账（分页，可按审批状态过滤）
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [PENDING_HUMAN_REVIEW, APPROVED, REJECTED] }
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: page_size
+          schema: { type: integer, default: 20, maximum: 100 }
+      responses:
+        '200': { description: 任务分页结果（含审批人与发布时间） }
+  /ai/v1/marketing/tasks/{task_id}/approve:
+    post:
+      tags: [营销]
+      summary: 审批通过营销任务（村委/平台管理员）
+      parameters:
+        - in: path
+          name: task_id
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200': { description: 审批后任务 }
+        '400': { description: 状态不允许（A1001） }
+  /ai/v1/marketing/tasks/{task_id}/reject:
+    post:
+      tags: [营销]
+      summary: 驳回营销任务（村委/平台管理员）
+      parameters:
+        - in: path
+          name: task_id
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200': { description: 驳回后任务 }
+  /ai/v1/marketing/tasks/{task_id}/publish:
+    post:
+      tags: [营销]
+      summary: 标记任务已发布（仅 APPROVED 可用；未经人工批准不得发布）
+      parameters:
+        - in: path
+          name: task_id
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200': { description: 发布留痕后的任务 }
+        '400': { description: 未审批通过（A1001） }
+
+
+  # ============================================================
+  # 第三批：订单闭环（物流/取消/匿名查询凭证）、政府导出、渠道回调
+  # ============================================================
+  /orders/{orderNo}/cancel:
+    post:
+      tags: [订单履约]
+      summary: 取消未支付订单（CANCELLED + 库存回补）
+      description: 需 JWT；仅 STOCK_CONFIRMED 且未支付可取消，条件状态门保证并发下仅一次生效并回补库存；状态不符 409 + B2003。
+      parameters:
+        - in: path
+          name: orderNo
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, maxLength: 200 }
+      responses:
+        '200': { description: 取消后的订单摘要 }
+        '404': { description: 订单不存在或跨租户（A1004） }
+        '409': { description: 已支付/已关闭（B2003） }
+  /orders/guest/lookup:
+    post:
+      tags: [订单查询（匿名）]
+      summary: 本人订单查询（订单号 + 一次性查询凭证；返回脱敏信息）
+      security: []
+      description: 凭证服务端以 PBKDF2 校验；未命中统一 404，避免订单号枚举；响应中手机号/姓名/地址均已脱敏。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderNo, queryToken]
+              properties:
+                orderNo: { type: string, maxLength: 64 }
+                queryToken: { type: string, maxLength: 128 }
+      responses:
+        '200': { description: 脱敏订单状态与物流信息 }
+        '400': { description: 缺少订单号或凭证（A1001） }
+        '404': { description: 订单不存在或凭证不正确（A1004） }
+  /orders/guest/cancel:
+    post:
+      tags: [订单查询（匿名）]
+      summary: 本人取消未支付订单（订单号 + 查询凭证；含库存回补）
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderNo, queryToken]
+              properties:
+                orderNo: { type: string, maxLength: 64 }
+                queryToken: { type: string, maxLength: 128 }
+                reason: { type: string, maxLength: 200 }
+      responses:
+        '200': { description: 取消后的脱敏订单状态 }
+        '404': { description: 订单不存在或凭证不正确（A1004） }
+        '409': { description: 已支付/已关闭（B2003） }
+  /gov/export:
+    get:
+      tags: [政府治理]
+      summary: 导出授权范围聚合为 CSV（含导出审计 GOV_EXPORT）
+      description: 需 JWT；仅 GOVERNMENT/PLATFORM_ADMIN；返回 UTF-8 BOM CSV（便于 Excel 识别中文），并写审计日志。
+      parameters:
+        - in: query
+          name: scope
+          schema: { type: string, default: all }
+      responses:
+        '200':
+          description: CSV 文件
+          content:
+            text/csv:
+              schema: { type: string }
+        '403': { description: 角色无权（A1003） }
+  /channels/{channel}/notify:
+    post:
+      tags: [渠道回调]
+      summary: 外部渠道回调入口（默认未配置，返回 503/C5003）
+      security: []
+      description: 由渠道签名认证（HMAC-SHA256 + 时间窗）。渠道未配置 → 503 + C5003；签名失败 → 403；签名通过但回流未实现 → 501 + C5004。绝不假装已接入。
+      parameters:
+        - in: path
+          name: channel
+          required: true
+          schema: { type: string, enum: [douyin, kuaishou, b2b_portal] }
+        - in: header
+          name: X-Channel-Timestamp
+          schema: { type: string }
+        - in: header
+          name: X-Channel-Signature
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '404': { description: 不支持的渠道（A1004） }
+        '501': { description: 已通过签名校验但回流未实现（C5004） }
+        '503': { description: 渠道未配置（C5003） }
+
+
 components:
   securitySchemes:
     BearerAuth:
       type: http
       scheme: bearer
+  /admin/tenants:
+    get:
+      tags: [平台管理]
+      summary: 租户列表（PLATFORM_ADMIN）
+      responses:
+        '200': { description: 租户列表 }
+        '403': { description: 角色无权（A1003） }
+    post:
+      tags: [平台管理]
+      summary: 创建租户（PLATFORM_ADMIN）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenantId, name]
+              properties:
+                tenantId: { type: string, maxLength: 64 }
+                name: { type: string, maxLength: 128 }
+                region: { type: string }
+                tenantType: { type: string, enum: [VILLAGE, COOPERATIVE, PLATFORM] }
+                parentRegion: { type: string }
+      responses:
+        '200': { description: 创建成功 }
+        '409': { description: 租户标识已存在 }
+  /admin/users:
+    get:
+      tags: [平台管理]
+      summary: 账号列表（PLATFORM_ADMIN，不返回密码哈希）
+      parameters:
+        - in: query
+          name: tenantId
+          schema: { type: string }
+      responses:
+        '200': { description: 账号列表 }
+    post:
+      tags: [平台管理]
+      summary: 创建账号（初始口令，首次登录强制改密）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenantId, username, password, displayName, role]
+              properties:
+                tenantId: { type: string }
+                username: { type: string, minLength: 3, maxLength: 64 }
+                password: { type: string, minLength: 8 }
+                displayName: { type: string }
+                role: { type: string, enum: [PLATFORM_ADMIN, GOVERNMENT, VILLAGE, COOPERATIVE, FARMER, CONSUMER] }
+                phone: { type: string }
+      responses:
+        '200': { description: 创建成功 }
+        '409': { description: 用户名已存在 }
+  /admin/users/{id}/status:
+    patch:
+      tags: [平台管理]
+      summary: 启用/停用账号（PLATFORM_ADMIN）
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [ACTIVE, DISABLED] }
+                reason: { type: string }
+      responses:
+        '200': { description: 更新成功 }
+  /admin/users/{id}/password/reset:
+    post:
+      tags: [平台管理]
+      summary: 重置账号密码（返回一次性临时口令并要求首次改密）
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200': { description: 返回 username / temporaryPassword / mustChangePassword }
+  /admin/users/{id}/scopes:
+    get:
+      tags: [平台管理]
+      summary: 查询账号数据授权范围
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200': { description: 授权范围列表 }
+    post:
+      tags: [平台管理]
+      summary: 授予账号数据授权范围（ALL / REGION / TENANT）
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scopeType, scopeValue]
+              properties:
+                scopeType: { type: string, enum: [ALL, REGION, TENANT] }
+                scopeValue: { type: string, maxLength: 128 }
+      responses:
+        '200': { description: 授权成功 }
+        '409': { description: 范围已存在 }
+
+
       bearerFormat: JWT
 
   schemas:
@@ -646,7 +1105,7 @@ components:
       properties:
         token:
           type: string
-          description: JWT 访问令牌（Authorization: Bearer <token>）
+          description: "JWT 访问令牌（Authorization: Bearer <token>）"
           example: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiJ9.signature"
         tokenType:
           type: string
@@ -675,7 +1134,7 @@ components:
               example: "tenant_yuzhuang_001"
             role:
               type: string
-              enum: [FARMER, COOPERATIVE, VILLAGE]
+              enum: [PLATFORM_ADMIN, GOVERNMENT, VILLAGE, COOPERATIVE, FARMER, CONSUMER]
               example: "VILLAGE"
 
     # 商品上架/编辑请求模型
@@ -824,7 +1283,7 @@ components:
               expectedUnitPrice:
                 type: number
                 format: double
-                description: 前端校验单价 (单位: 元)
+                description: "前端校验单价 (单位: 元)"
                 example: 45.00
         receiverAddress:
           type: object

@@ -4,6 +4,9 @@
 .env
 .env.*
 !.env.example
+!.env.production.example
+# 数据库备份产物（scripts/backup_db.sh 输出）
+/backups/
 
 # ===== Java / Spring Boot (backend) =====
 backend/target/

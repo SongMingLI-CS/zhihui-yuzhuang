@@ -5,6 +5,13 @@
 > 缺口子项即后续待办清单，避免代码与文档不一致导致重复实现或漏补。
 > 变更约定：每实现一项立即勾选回填；代码与文档冲突时以代码为准并回填本文档；接口契约变更须同步 `docs/api-spec.yaml`。
 
+## 2026-09-12 整改批次（已落地）
+
+- ✅ 阶段 A：`APP_ENV`/`DEMO_MODE` 边界、生产启动 fail-fast、账号安全字段与首登改密、Cookie 会话 + CSRF、Nginx 生产模板、Compose 生产编排、备份/恢复脚本。
+- ✅ 阶段 B：`PLATFORM_ADMIN`/`GOVERNMENT` 角色、`t_gov_scope` 授权范围、端点级权限策略（deny-by-default）、平台管理 API + 最小 UI、审计日志、AI 侧 JWT 鉴权。
+- ◐ 阶段 C/D 核心：商家商品全状态分页（修复下架不可见）、政府只读聚合（口径 + 快照 + 脱敏）、`/b/merchant`、`/b/gov`、`/b/platform` 页面。
+- ○ 待办：商品媒体/对象存储、政府导出与真实事件流、支付 Provider 与订单中心、AI readiness/审批持久化、移动端与渠道适配器、Playwright E2E 与压测。
+
 ## 阶段总览
 
 ```text

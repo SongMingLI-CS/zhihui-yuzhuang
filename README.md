@@ -2,7 +2,22 @@
 
 面向**全国大学生乡村振兴大赛**的助农平台项目。本项目聚焦**河南省周口市鹿邑县试量镇于庄**，将大模型 AI（RAG 与多智能体）与高并发微服务后端深度融合，构建"前端轻量化、中间移动协同、后台集中调度"的现代数字化助农平台，并以 **Roo Code + DeepSeek-R1 的全自动 AI 编程流水线**高效落地。
 
+## 整改状态（2026-09-12）
+
+> 已完成一轮生产安全与权限边界整改，详见 [`docs/remediation-report-2026-09-12.md`](docs/remediation-report-2026-09-12.md)。
+>
+> - **演示/生产严格隔离**：`APP_ENV=production` 时不再自举演示账号、不灌演示数据，缺少高熵 `AUTH_JWT_SECRET` 直接启动失败（`ProductionSafetyValidator`）。
+> - **政府/商家/消费者边界**：新增 `PLATFORM_ADMIN`、`GOVERNMENT` 角色与 `t_gov_scope` 授权范围；端点级权限矩阵取代“任意 GET 可读”，农户不可读治理大盘与全租户订单，政府只读。
+> - **会话安全**：B 端改用 `HttpOnly+Secure+SameSite` Cookie + CSRF 双提交；401 跳转已按 `basePath` 修正；新增 `SessionGuard` 路由守卫与首次登录强制改密。
+> - **生产部署**：`deploy/docker-compose.prod.yml`（仅暴露 80/443）、`deploy/nginx/nginx.prod.conf.template`（TLS/安全头/限流）、备份恢复脚本与 [`deploy/PRODUCTION.md`](deploy/PRODUCTION.md)。
+> - **AI 鉴权**：知识上传/删除与营销生成需有效 JWT 与角色，匿名问答仅限公共知识域并限流。
+>
+> ⚠️ **能力现状说明**：`mobile/`（M 端 Flutter）仍**未实现**，本轮已不再宣称“三端已完成”；抖音/快手/B2B 渠道仅有枚举，**未接入**；支付仅有 demo 沙箱，**生产未配置真实商户时禁用**；商品图片对象存储、政府导出、真实事件流、Playwright E2E 与压测仍为待办（见整改报告第 6 节）。
+
+
+
 ## 落地场景与痛点
+
 
 赋能鹿邑县试量镇于庄，解决乡村数字化四大痛点：
 

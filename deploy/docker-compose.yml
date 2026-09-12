@@ -86,6 +86,12 @@ services:
       SPRING_SQL_INIT_MODE: always
       SPRING_SQL_INIT_SCHEMA_LOCATIONS: classpath:db/migration/V1__init.sql
       SPRING_SQL_INIT_DATA_LOCATIONS: classpath:db/seed-data.sql
+      # ---- 演示环境显式开关（生产禁止；见 ProductionSafetyValidator）----
+      APP_ENV: ${APP_ENV:-demo}
+      DEMO_MODE: "true"
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-yuzhuang-demo-jwt-secret-0123456789abcdef}
+      # 本地/演示走 http://localhost，Secure=false；生产必须 true
+      AUTH_SESSION_COOKIE_SECURE: "false"
       # Outbox -> Redis Streams 可靠投递开关（Redis 不可达时组件自动降级，不阻断启动）
       OUTBOX_ENABLED: "true"
       SERVER_PORT: "8080"
@@ -107,6 +113,10 @@ services:
     environment:
       # 容器内通过 compose 网络以服务名 postgres 访问数据库
       DATABASE_URL: postgresql://${POSTGRES_USER:-rural_user}:${POSTGRES_PASSWORD:-rural_password}@postgres:5432/${POSTGRES_DB:-rural_revitalization}
+      # 与 backend 同密钥的身份校验（阶段 B：AI 端点鉴权）
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-yuzhuang-demo-jwt-secret-0123456789abcdef}
+      APP_ENV: ${APP_ENV:-demo}
+      DEMO_MODE: "true"
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
       # 离线 embedding：留空则使用内置降级（sentence-transformers 未装时自动 Mock），
