@@ -25,6 +25,9 @@ public class AuthLoginResponse {
     /** 令牌有效期（秒） */
     private long expiresIn;
 
+    /** 是否要求下次登录改密（演示账号/管理员重置后为 true，前端应跳转改密页） */
+    private boolean mustChangePassword;
+
     /** 登录用户信息 */
     private UserInfoResponse user;
 }

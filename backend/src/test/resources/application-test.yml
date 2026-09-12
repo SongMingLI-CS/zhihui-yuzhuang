@@ -35,6 +35,9 @@ yuzhuang:
   # 关闭超时关单定时任务（服务层仍可被测试直接调用）
   order-close:
     enabled: false
+  # 演示账号自举：契约测试依赖 seed 出的 admin/coop001/farmer001（H2 内存库，仅测试进程）。
+  demo:
+    enabled: true
 
 mybatis-plus:
   global-config:

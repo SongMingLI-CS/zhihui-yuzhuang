@@ -70,9 +70,29 @@ springdoc:
 # enabled=false 时禁用后台 Sweeper/消费者/Stream 监听（测试环境隔离）。
 # ============================================================
 yuzhuang:
+  # ---- 运行环境与演示开关（生产安全边界唯一入口）----
+  # app-env: production/prod 为生产；dev/local/demo/test 为非生产。
+  # demo.enabled: 必须显式打开才允许演示账号自举与演示灌数；生产强制 false 并在启动校验中拒绝。
+  app-env: ${APP_ENV:dev}
+  demo:
+    enabled: ${DEMO_MODE:false}
+
   auth:
+    # 开发默认密钥仅用于本地/演示；生产缺少高熵 AUTH_JWT_SECRET 时由 ProductionSafetyValidator 拒绝启动。
     secret: ${AUTH_JWT_SECRET:yuzhuang-demo-jwt-secret-0123456789abcdef}
     expire-minutes: ${AUTH_JWT_EXPIRE_MINUTES:120}
+    # 会话 Cookie：B 端浏览器登录优先使用 HttpOnly Cookie（写接口走 CSRF 双提交校验）。
+    session-cookie:
+      enabled: ${AUTH_SESSION_COOKIE_ENABLED:true}
+      name: ${AUTH_SESSION_COOKIE_NAME:yz_session}
+      # 生产必须为 true（HTTPS）；非生产默认 false 以便 http://localhost 调试。
+      secure: ${AUTH_SESSION_COOKIE_SECURE:false}
+      same-site: ${AUTH_SESSION_COOKIE_SAME_SITE:Lax}
+      domain: ${AUTH_SESSION_COOKIE_DOMAIN:}
+    csrf:
+      enabled: ${AUTH_CSRF_ENABLED:true}
+      header-name: ${AUTH_CSRF_HEADER_NAME:X-CSRF-Token}
+      cookie-name: ${AUTH_CSRF_COOKIE_NAME:yz_csrf}
   outbox:
     enabled: ${OUTBOX_ENABLED:true}
     scan-interval-ms: ${OUTBOX_SCAN_INTERVAL_MS:2000}
@@ -90,6 +110,23 @@ yuzhuang:
     scan-interval-ms: ${ORDER_CLOSE_SCAN_INTERVAL_MS:60000}
     initial-delay-ms: ${ORDER_CLOSE_INITIAL_DELAY_MS:15000}
     batch-size: ${ORDER_CLOSE_BATCH_SIZE:50}
+
+  # ============================================================
+  # 外部销售渠道（阶段 G）：默认全部关闭且无密钥。
+  # 未配置时 /api/v1/channels/{channel}/notify 明确返回 503 + C5003，
+  # 不接收任何回调、也不在文档中宣称“已接入”。
+  # 拿到真实凭证后：设置 enabled=true 并注入 secret（仅环境变量/secret，勿入库前端）。
+  # ============================================================
+  channel:
+    douyin:
+      enabled: ${CHANNEL_DOUYIN_ENABLED:false}
+      secret: ${CHANNEL_DOUYIN_SECRET:}
+    kuaishou:
+      enabled: ${CHANNEL_KUAISHOU_ENABLED:false}
+      secret: ${CHANNEL_KUAISHOU_SECRET:}
+    b2b:
+      enabled: ${CHANNEL_B2B_ENABLED:false}
+      secret: ${CHANNEL_B2B_SECRET:}
 
 logging:
   level:

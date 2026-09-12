@@ -19,6 +19,17 @@ public interface OrderFulfillmentService {
     OrderSummaryResponse shipOrder(String tenantId, String orderNo);
 
     /**
+     * 一键出库并登记物流（阶段 E/C）：READY → SHIPPED，同时写入承运商/物流单号/发货时间。
+     *
+     * @param tenantId   租户标识
+     * @param orderNo    业务订单号
+     * @param carrier    承运商（可空）
+     * @param trackingNo 物流单号（可空）
+     * @return 出库后的订单摘要（含物流字段）
+     */
+    OrderSummaryResponse shipOrder(String tenantId, String orderNo, String carrier, String trackingNo);
+
+    /**
      * 拣货完成置为待出库：履约状态 {@code PICKING → READY}。
      *
      * @param tenantId 租户标识

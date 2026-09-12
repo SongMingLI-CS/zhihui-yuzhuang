@@ -9,6 +9,7 @@ import com.yuzhuang.common.exception.BusinessException;
 import com.yuzhuang.inventory.service.InventoryService;
 import com.yuzhuang.order.dto.PaymentSandboxPayRequest;
 import com.yuzhuang.order.dto.PaymentSandboxResponse;
+import com.yuzhuang.order.dto.OrderSummaryResponse;
 import com.yuzhuang.order.entity.Order;
 import com.yuzhuang.order.entity.OrderItem;
 import com.yuzhuang.order.enums.OrderStatus;
@@ -49,6 +50,7 @@ public class OrderPaymentClosureServiceImpl implements OrderPaymentClosureServic
     private static final String EVENT_ORDER_PAID = "ORDER_PAID";
     private static final String EVENT_ORDER_CANCELLED = "ORDER_CANCELLED";
     private static final String CLOSE_REASON_PAY_TIMEOUT = "PAY_TIMEOUT";
+    private static final String CLOSE_REASON_MANUAL_CANCEL = "MANUAL_CANCEL";
 
     private final OrderMapper orderMapper;
     private final OrderItemMapper orderItemMapper;
@@ -160,6 +162,47 @@ public class OrderPaymentClosureServiceImpl implements OrderPaymentClosureServic
             log.info("[order-close] batch done, closed={}, cutoff={}", closed, cutoff);
         }
         return closed;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public OrderSummaryResponse cancelOrder(String tenantId, String orderNo, String reason) {
+        Order order = findOrder(tenantId, orderNo);
+        if (order.getPaidAt() != null || order.getStatus() != OrderStatus.STOCK_CONFIRMED) {
+            throw new BusinessException(ResultCode.ORDER_STATE_CONFLICT, "订单已支付或已关闭，无法取消");
+        }
+        String trimmedReason = (reason == null || reason.isBlank()) ? null : reason.trim();
+        int rows = orderMapper.update(null, new LambdaUpdateWrapper<Order>()
+                .eq(Order::getTenantId, tenantId)
+                .eq(Order::getOrderNo, orderNo)
+                .eq(Order::getStatus, OrderStatus.STOCK_CONFIRMED)
+                .isNull(Order::getPaidAt)
+                .set(Order::getStatus, OrderStatus.CANCELLED)
+                .set(Order::getCancelledAt, LocalDateTime.now())
+                .set(Order::getCloseReason, CLOSE_REASON_MANUAL_CANCEL)
+                .set(Order::getCancelReason, trimmedReason));
+        if (rows == 0) {
+            // 并发下已被支付/关闭：条件状态门只允许一次生效
+            throw new BusinessException(ResultCode.ORDER_STATE_CONFLICT, "订单状态已变更，请刷新后重试");
+        }
+        releaseStock(orderNo);
+        Order cancelled = findOrder(tenantId, orderNo);
+        outboxEventMapper.insert(buildEvent(cancelled, EVENT_ORDER_CANCELLED));
+        log.info("[order-cancel] orderNo={}, tenantId={}, reason={}", orderNo, tenantId,
+                trimmedReason == null ? CLOSE_REASON_MANUAL_CANCEL : trimmedReason);
+        return OrderSummaryResponse.builder()
+                .orderNo(cancelled.getOrderNo())
+                .orderSource(cancelled.getOrderSource().name())
+                .totalAmount(cancelled.getTotalAmount())
+                .status(cancelled.getStatus().name())
+                .fulfillmentStatus(cancelled.getFulfillmentStatus() == null
+                        ? null : cancelled.getFulfillmentStatus().name())
+                .recipientName(cancelled.getRecipientName())
+                .createdAt(cancelled.getCreatedAt())
+                .carrier(cancelled.getCarrier())
+                .trackingNo(cancelled.getTrackingNo())
+                .shippedAt(cancelled.getShippedAt())
+                .build();
     }
 
     /** 按明细行原子回补 SKU 库存（必须在关单同一事务内）。 */

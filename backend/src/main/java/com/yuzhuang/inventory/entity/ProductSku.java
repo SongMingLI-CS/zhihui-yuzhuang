@@ -52,6 +52,27 @@ public class ProductSku {
     /** 状态：ACTIVE 在售 / INACTIVE 下架 */
     private String status;
 
+    /** 商品分类（如 GRAIN_OIL 粮油 / FRUIT 果蔬 / OTHER 其他） */
+    private String category;
+
+    /** 计量单位（件/袋/箱/斤等） */
+    private String unit;
+
+    /** 产地 */
+    private String origin;
+
+    /** 商品详情（纯文本；富文本/媒体按约定延后） */
+    private String detail;
+
+    /** 库存预警阈值（stock <= 阈值 时进入预警列表） */
+    private Integer stockAlert;
+
+    /** 创建人用户名 */
+    private String createdBy;
+
+    /** 最近更新时间 */
+    private LocalDateTime updatedAt;
+
     /** 创建时间 */
     private LocalDateTime createdAt;
 }

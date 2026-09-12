@@ -1,5 +1,6 @@
 package com.yuzhuang.product.service;
 
+import com.yuzhuang.product.dto.ProductProfileRequest;
 import com.yuzhuang.product.dto.ProductSkuResponse;
 import com.yuzhuang.product.dto.ProductStatusRequest;
 import com.yuzhuang.product.dto.ProductUpsertRequest;
@@ -43,4 +44,14 @@ public interface ProductAdminService {
      * @throws com.yuzhuang.common.exception.BusinessException 商品不存在或跨租户抛 A1004
      */
     ProductSkuResponse updateStatus(Long id, ProductStatusRequest request, String tenantId);
+
+    /**
+     * 更新商品扩展资料（分类/单位/产地/详情/库存预警阈值）。作用域规则同 {@link #updateProduct}。
+     *
+     * @param id       SKU 主键
+     * @param request  扩展资料（字段为 null 表示不修改）
+     * @param tenantId 操作者租户标识（来自 JWT）
+     * @return 更新后的商品响应
+     */
+    ProductSkuResponse updateProfile(Long id, ProductProfileRequest request, String tenantId);
 }

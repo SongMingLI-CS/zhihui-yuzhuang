@@ -27,6 +27,10 @@ public enum ResultCode {
     FORBIDDEN("A1003", "无权限访问该资源", HttpStatus.FORBIDDEN),
     /** 请求的资源不存在 */
     NOT_FOUND("A1004", "请求的资源不存在", HttpStatus.NOT_FOUND),
+    /** 账号已锁定（连续登录失败） */
+    ACCOUNT_LOCKED("A1005", "账号已锁定，请稍后再试", HttpStatus.LOCKED),
+    /** 密码不符合安全策略 */
+    PASSWORD_POLICY_VIOLATION("A1006", "新密码不符合安全策略", HttpStatus.BAD_REQUEST),
 
     // ==================== B2 交易 / 业务冲突 ====================
     /** 库存不足（spec 409 示例：B2001） */
@@ -42,7 +46,11 @@ public enum ResultCode {
     /** 系统内部错误兜底 */
     SYSTEM_ERROR("C5001", "系统繁忙，请稍后重试", HttpStatus.INTERNAL_SERVER_ERROR),
     /** 下游依赖服务暂不可用 */
-    DEPENDENT_SERVICE_ERROR("C5002", "依赖服务暂不可用，请稍后重试", HttpStatus.SERVICE_UNAVAILABLE);
+    DEPENDENT_SERVICE_ERROR("C5002", "依赖服务暂不可用，请稍后重试", HttpStatus.SERVICE_UNAVAILABLE),
+    /** 渠道未配置（阶段 G：外部渠道未提供凭证时的明确状态） */
+    CHANNEL_NOT_CONFIGURED("C5003", "该渠道尚未配置，暂不接收回调", HttpStatus.SERVICE_UNAVAILABLE),
+    /** 渠道订单回流尚未实现（已配置凭证但接入未完成） */
+    CHANNEL_INTAKE_NOT_IMPLEMENTED("C5004", "该渠道订单回流尚未实现", HttpStatus.NOT_IMPLEMENTED);
 
     private final String code;
     private final String message;

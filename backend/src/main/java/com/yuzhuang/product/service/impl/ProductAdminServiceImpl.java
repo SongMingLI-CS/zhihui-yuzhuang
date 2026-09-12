@@ -2,6 +2,7 @@ package com.yuzhuang.product.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.yuzhuang.audit.service.AuditService;
 import com.yuzhuang.auth.context.AuthContext;
 import com.yuzhuang.auth.context.AuthPrincipal;
 import com.yuzhuang.auth.enums.UserRole;
@@ -9,6 +10,7 @@ import com.yuzhuang.common.enums.ResultCode;
 import com.yuzhuang.common.exception.BusinessException;
 import com.yuzhuang.inventory.entity.ProductSku;
 import com.yuzhuang.inventory.mapper.ProductSkuMapper;
+import com.yuzhuang.product.dto.ProductProfileRequest;
 import com.yuzhuang.product.dto.ProductSkuResponse;
 import com.yuzhuang.product.dto.ProductStatusRequest;
 import com.yuzhuang.product.dto.ProductUpsertRequest;
@@ -40,9 +42,11 @@ public class ProductAdminServiceImpl implements ProductAdminService {
     private static final String DESCRIPTION_SUFFIX = "，传统工艺，地道风味";
 
     private final ProductSkuMapper productSkuMapper;
+    private final AuditService auditService;
 
-    public ProductAdminServiceImpl(ProductSkuMapper productSkuMapper) {
+    public ProductAdminServiceImpl(ProductSkuMapper productSkuMapper, AuditService auditService) {
         this.productSkuMapper = productSkuMapper;
+        this.auditService = auditService;
     }
 
     @Override
@@ -65,7 +69,10 @@ public class ProductAdminServiceImpl implements ProductAdminService {
                 .stock(request.getStock())
                 .version(0)
                 .status(status)
+                .stockAlert(0)
+                .createdBy(AuthContext.get() == null ? null : AuthContext.get().getUsername())
                 .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
                 .build();
         try {
             productSkuMapper.insert(sku);
@@ -73,6 +80,8 @@ public class ProductAdminServiceImpl implements ProductAdminService {
             // 并发下唯一约束兜底
             throw new BusinessException(ResultCode.SKU_CODE_CONFLICT);
         }
+        auditService.record("PRODUCT_CREATE", "PRODUCT", sku.getSkuCode(),
+                "创建商品 tenant=" + tenant + " status=" + status, true);
         return toResponse(sku);
     }
 
@@ -93,6 +102,8 @@ public class ProductAdminServiceImpl implements ProductAdminService {
         } catch (DuplicateKeyException ex) {
             throw new BusinessException(ResultCode.SKU_CODE_CONFLICT);
         }
+        auditService.record("PRODUCT_UPDATE", "PRODUCT", String.valueOf(id),
+                "编辑商品 " + request.getSpuName() + "（价格/库存/状态）", true);
         return toResponse(sku);
     }
 
@@ -105,7 +116,41 @@ public class ProductAdminServiceImpl implements ProductAdminService {
         if (updated != 1) {
             throw new BusinessException(ResultCode.NOT_FOUND, "商品不存在或已被移除");
         }
+        auditService.record("PRODUCT_STATUS", "PRODUCT", String.valueOf(id),
+                "商品状态切换为 " + sku.getStatus(), true);
         return toResponse(sku);
+    }
+
+    @Override
+    public ProductSkuResponse updateProfile(Long id, ProductProfileRequest request, String tenantId) {
+        ProductSku sku = getOrThrow(id, tenantId);
+        ProductSku update = new ProductSku();
+        update.setId(id);
+        // 仅在请求显式给出字段时更新（null = 不修改）
+        if (request.getCategory() != null) {
+            update.setCategory(request.getCategory().trim());
+        }
+        if (request.getUnit() != null) {
+            update.setUnit(request.getUnit().trim());
+        }
+        if (request.getOrigin() != null) {
+            update.setOrigin(request.getOrigin().trim());
+        }
+        if (request.getDetail() != null) {
+            update.setDetail(request.getDetail().trim());
+        }
+        if (request.getStockAlert() != null) {
+            update.setStockAlert(request.getStockAlert());
+        }
+        update.setUpdatedAt(LocalDateTime.now());
+        int updated = productSkuMapper.update(update,
+                new LambdaUpdateWrapper<ProductSku>().eq(ProductSku::getId, id));
+        if (updated != 1) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "商品不存在或已被移除");
+        }
+        auditService.record("PRODUCT_PROFILE", "PRODUCT", String.valueOf(id),
+                "更新商品扩展资料（分类/单位/产地/详情/库存预警阈值）", true);
+        return toResponse(productSkuMapper.selectById(id));
     }
 
     private ProductSku getOrThrow(Long id, String tenantId) {
@@ -139,16 +184,18 @@ public class ProductAdminServiceImpl implements ProductAdminService {
         return (tenantId == null || tenantId.isBlank()) ? DEFAULT_TENANT_ID : tenantId.trim();
     }
 
-    /** 状态规整：空默认在售；仅接受 ON_SALE / OFF_SHELF。 */
+    /** 状态规整：空默认在售；接受 DRAFT / ON_SALE / OFF_SHELF / ARCHIVED（阶段 C 新增草稿与归档）。 */
     private String normalizeStatus(String status) {
         if (status == null || status.isBlank()) {
             return STATUS_ON_SALE;
         }
-        String s = status.trim();
-        if (STATUS_ON_SALE.equals(s) || STATUS_OFF_SHELF.equals(s)) {
+        String s = status.trim().toUpperCase();
+        if (STATUS_ON_SALE.equals(s) || STATUS_OFF_SHELF.equals(s)
+                || "DRAFT".equals(s) || "ARCHIVED".equals(s)) {
             return s;
         }
-        throw new BusinessException(ResultCode.PARAM_ERROR, "商品状态仅支持 ON_SALE / OFF_SHELF");
+        throw new BusinessException(ResultCode.PARAM_ERROR,
+                "商品状态仅支持 DRAFT / ON_SALE / OFF_SHELF / ARCHIVED");
     }
 
     private ProductSkuResponse toResponse(ProductSku sku) {
@@ -162,6 +209,26 @@ public class ProductAdminServiceImpl implements ProductAdminService {
                 .tenantId(sku.getTenantId())
                 .description(DESCRIPTION_PREFIX + sku.getSpuName() + DESCRIPTION_SUFFIX)
                 .imageUrl(IMAGE_URL_PREFIX + sku.getSkuCode() + IMAGE_URL_SUFFIX)
+                .category(sku.getCategory())
+                .unit(sku.getUnit())
+                .origin(sku.getOrigin())
+                .detail(sku.getDetail())
+                .stockAlert(sku.getStockAlert())
+                .lowStock(isLowStock(sku))
+                .createdBy(sku.getCreatedBy())
+                .updatedAt(sku.getUpdatedAt() == null ? null : sku.getUpdatedAt().toString())
                 .build();
+    }
+
+    /** 是否库存预警：阈值 > 0 且库存 <= 阈值，且商品未归档。 */
+    public static boolean isLowStock(ProductSku sku) {
+        Integer alert = sku.getStockAlert();
+        if (alert == null || alert <= 0) {
+            return false;
+        }
+        if ("ARCHIVED".equals(sku.getStatus())) {
+            return false;
+        }
+        return sku.getStock() != null && sku.getStock() <= alert;
     }
 }

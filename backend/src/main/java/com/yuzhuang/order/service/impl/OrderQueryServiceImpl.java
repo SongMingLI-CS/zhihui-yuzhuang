@@ -124,6 +124,9 @@ public class OrderQueryServiceImpl implements OrderQueryService {
                 .fulfillmentStatus(order.getFulfillmentStatus().name())
                 .recipientName(order.getRecipientName())
                 .createdAt(order.getCreatedAt())
+                .carrier(order.getCarrier())
+                .trackingNo(order.getTrackingNo())
+                .shippedAt(order.getShippedAt())
                 .build();
     }
 
@@ -148,6 +151,10 @@ public class OrderQueryServiceImpl implements OrderQueryService {
                 .detailedAddress(order.getDetailedAddress())
                 .remark(order.getRemark())
                 .createdAt(order.getCreatedAt())
+                .carrier(order.getCarrier())
+                .trackingNo(order.getTrackingNo())
+                .shippedAt(order.getShippedAt())
+                .cancelReason(order.getCancelReason())
                 .items(itemResponses)
                 .build();
     }

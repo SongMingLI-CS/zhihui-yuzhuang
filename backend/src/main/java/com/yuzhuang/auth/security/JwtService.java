@@ -3,6 +3,8 @@ package com.yuzhuang.auth.security;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yuzhuang.auth.context.AuthPrincipal;
+import com.yuzhuang.config.AppEnvironment;
+import com.yuzhuang.config.SecurityDefaults;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -33,9 +35,19 @@ public class JwtService {
 
     public JwtService(@Value("${yuzhuang.auth.secret}") String secret,
                       @Value("${yuzhuang.auth.expire-minutes:120}") long expireMinutes,
+                      AppEnvironment appEnvironment,
                       ObjectMapper objectMapper) {
         if (secret == null || secret.isBlank()) {
             throw new IllegalStateException("yuzhuang.auth.secret 未配置");
+        }
+        // 生产环境禁止弱/默认密钥：即便绕过 ProductionSafetyValidator，也在签发组件入口再兜底一次。
+        if (appEnvironment.isProduction()) {
+            if (SecurityDefaults.DEV_JWT_SECRET.equals(secret)
+                    || secret.length() < SecurityDefaults.MIN_PRODUCTION_SECRET_LENGTH) {
+                throw new IllegalStateException(
+                        "生产环境 AUTH_JWT_SECRET 必须为高熵密钥（长度 ≥ "
+                                + SecurityDefaults.MIN_PRODUCTION_SECRET_LENGTH + " 且不得使用开发默认值）");
+            }
         }
         this.secret = secret.getBytes(StandardCharsets.UTF_8);
         this.expireSeconds = expireMinutes * 60L;

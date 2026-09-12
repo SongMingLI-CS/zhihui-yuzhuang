@@ -128,17 +128,30 @@ class WebContractTest extends WebAuthTestSupport {
     }
 
     @Test
-    void farmerCanReadOwnTenantOrders_butCannotShip() throws Exception {
-        // 只读放行（任意已认证角色）→ 200 00000（数据域=令牌 tenantId，行数不在此断言）
+    void farmerCannotReadTenantOrdersNorShip() throws Exception {
+        // 阶段 B 安全基线：农户不得读取全租户订单（含收货 PII）→ 403 A1003
         mockMvc.perform(get("/api/v1/orders").header(HeaderNames.AUTHORIZATION, farmerBearer()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value("00000"));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("A1003"));
+
+        // 农户不得读取治理大盘 → 403 A1003
+        mockMvc.perform(get("/api/v1/dashboard/summary").header(HeaderNames.AUTHORIZATION, farmerBearer()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("A1003"));
 
         // 履约写需 COOPERATIVE/VILLAGE → 403 A1003
         mockMvc.perform(post("/api/v1/orders/ORD-NO-SUCH/ship")
                         .header(HeaderNames.AUTHORIZATION, farmerBearer()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("A1003"));
+    }
+
+    @Test
+    void villageCanReadTenantOrders() throws Exception {
+        // 村委/合作社可读本租户订单（数据域由令牌 tenantId 限定）→ 200
+        mockMvc.perform(get("/api/v1/orders").header(HeaderNames.AUTHORIZATION, villageBearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("00000"));
     }
 
     @Test

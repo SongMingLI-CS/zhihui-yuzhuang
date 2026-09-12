@@ -49,4 +49,30 @@ public class ProductSkuResponse {
 
     /** 高清特产占位图地址（预置） */
     private String imageUrl;
+
+    // ---------- 阶段 C（非媒体）扩展字段 ----------
+
+    /** 商品分类 */
+    private String category;
+
+    /** 计量单位 */
+    private String unit;
+
+    /** 产地 */
+    private String origin;
+
+    /** 商品详情（纯文本） */
+    private String detail;
+
+    /** 库存预警阈值 */
+    private Integer stockAlert;
+
+    /** 是否处于库存预警（stock <= stockAlert，且非归档） */
+    private Boolean lowStock;
+
+    /** 创建人 */
+    private String createdBy;
+
+    /** 最近更新时间（ISO 字符串） */
+    private String updatedAt;
 }

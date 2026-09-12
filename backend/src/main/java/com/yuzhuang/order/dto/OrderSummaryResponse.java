@@ -40,4 +40,13 @@ public class OrderSummaryResponse {
 
     /** 创建时间 */
     private LocalDateTime createdAt;
+
+    /** 承运商（发货后填写） */
+    private String carrier;
+
+    /** 物流单号（发货后填写） */
+    private String trackingNo;
+
+    /** 发货时间 */
+    private LocalDateTime shippedAt;
 }

@@ -51,6 +51,33 @@ public class User {
     /** 状态：ACTIVE 启用 / DISABLED 停用 */
     private String status;
 
+    /** 是否强制下次登录改密（演示账号/管理员重置后为 true） */
+    private Boolean mustChangePassword;
+
+    /** 最近一次密码变更时间 */
+    private LocalDateTime passwordUpdatedAt;
+
+    /** 最近一次成功登录时间 */
+    private LocalDateTime lastLoginAt;
+
+    /** 停用时间 */
+    private LocalDateTime disabledAt;
+
+    /** 停用原因（审计留痕） */
+    private String disabledReason;
+
+    /** 连续登录失败次数（成功后清零） */
+    private Integer failedLoginCount;
+
+    /** 锁定到期时间（连续失败触发，期间拒绝登录） */
+    private LocalDateTime lockedUntil;
+
+    /** 账号创建者（平台管理员用户名） */
+    private String createdBy;
+
+    /** 最近更新时间 */
+    private LocalDateTime updatedAt;
+
     /** 创建时间 */
     private LocalDateTime createdAt;
 }

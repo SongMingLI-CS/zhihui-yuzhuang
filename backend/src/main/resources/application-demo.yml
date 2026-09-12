@@ -1,0 +1,15 @@
+# ============================================================
+# 演示 Profile（demo）
+# 用途：竞赛演示 / 一键全栈容器编排（deploy/docker-compose.yml）。
+# 与 dev 的区别：显式声明演示开关，且关闭 debug 日志噪音。
+# 生产环境严禁激活本 profile（ProductionSafetyValidator 会拒绝启动）。
+# 用法：SPRING_PROFILES_ACTIVE=demo DEMO_MODE=true
+# ============================================================
+yuzhuang:
+  app-env: ${APP_ENV:demo}
+  demo:
+    enabled: ${DEMO_MODE:true}
+
+logging:
+  level:
+    com.yuzhuang: info

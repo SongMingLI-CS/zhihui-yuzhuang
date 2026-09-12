@@ -69,6 +69,21 @@ public class Order {
     /** 关闭原因：PAY_TIMEOUT / MANUAL_CANCEL 等 */
     private String closeReason;
 
+    /** 承运商（发货时填写） */
+    private String carrier;
+
+    /** 物流单号（发货时填写） */
+    private String trackingNo;
+
+    /** 发货时间 */
+    private LocalDateTime shippedAt;
+
+    /** 取消原因补充说明（用户取消/超时关单） */
+    private String cancelReason;
+
+    /** 本人订单查询凭证哈希（下单时下发一次性凭证，库中只存哈希） */
+    private String queryTokenHash;
+
     /** 收货人姓名 */
     private String recipientName;
 

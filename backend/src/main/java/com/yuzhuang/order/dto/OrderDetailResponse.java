@@ -51,6 +51,18 @@ public class OrderDetailResponse {
     /** 创建时间 */
     private LocalDateTime createdAt;
 
+    /** 承运商（发货后填写） */
+    private String carrier;
+
+    /** 物流单号（发货后填写） */
+    private String trackingNo;
+
+    /** 发货时间 */
+    private LocalDateTime shippedAt;
+
+    /** 取消原因（CANCELLED 时填写） */
+    private String cancelReason;
+
     /** 订单明细行 */
     private List<OrderItemResponse> items;
 }

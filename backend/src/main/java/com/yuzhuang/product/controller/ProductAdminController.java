@@ -2,6 +2,7 @@ package com.yuzhuang.product.controller;
 
 import com.yuzhuang.auth.context.AuthContext;
 import com.yuzhuang.common.api.ApiResponse;
+import com.yuzhuang.product.dto.ProductProfileRequest;
 import com.yuzhuang.product.dto.ProductSkuResponse;
 import com.yuzhuang.product.dto.ProductStatusRequest;
 import com.yuzhuang.product.dto.ProductUpsertRequest;
@@ -68,5 +69,15 @@ public class ProductAdminController {
         String tenantId = AuthContext.require().getTenantId();
         log.debug("[product-admin] update status id={}, status={}, tenantId={}", id, request.getStatus(), tenantId);
         return ApiResponse.success(productAdminService.updateStatus(id, request, tenantId));
+    }
+
+    @Operation(summary = "更新商品扩展资料（分类/单位/产地/详情/库存预警阈值）")
+    @PutMapping("/products/{id}/profile")
+    public ApiResponse<ProductSkuResponse> updateProfile(
+            @PathVariable("id") Long id,
+            @Valid @RequestBody ProductProfileRequest request) {
+        String tenantId = AuthContext.require().getTenantId();
+        log.debug("[product-admin] update profile id={}, tenantId={}", id, tenantId);
+        return ApiResponse.success(productAdminService.updateProfile(id, request, tenantId));
     }
 }

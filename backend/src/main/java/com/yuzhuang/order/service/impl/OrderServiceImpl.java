@@ -18,6 +18,7 @@ import com.yuzhuang.order.enums.OrderSource;
 import com.yuzhuang.order.enums.OrderStatus;
 import com.yuzhuang.order.mapper.OrderItemMapper;
 import com.yuzhuang.order.mapper.OrderMapper;
+import com.yuzhuang.order.support.QueryTokens;
 import com.yuzhuang.order.service.OrderService;
 import com.yuzhuang.outbox.entity.OutboxEvent;
 import com.yuzhuang.outbox.mapper.OutboxEventMapper;
@@ -96,14 +97,15 @@ public class OrderServiceImpl implements OrderService {
         if (existing != null) {
             if (isReplayable(existing.getStatus())) {
                 log.info("[order] idempotent replay orderNo={}, tenantId={}", existing.getOrderNo(), tenantId);
-                return toResponse(existing);
+                return toResponse(existing, null);
             }
             log.warn("[order] idempotency conflict on status={}, tenantId={}", existing.getStatus(), tenantId);
             throw new BusinessException(ResultCode.IDEMPOTENT_CONFLICT);
         }
 
-        // 2. 生成业务订单号
+        // 2. 生成业务订单号 + 本人订单查询凭证（明文仅返回一次，库中只存哈希）
         String orderNo = generateOrderNo();
+        String queryToken = QueryTokens.generate();
         LocalDateTime now = LocalDateTime.now();
 
         // 3. 逐项 CAS 扣库存 + 计价（以数据库 SKU 实时价为唯一计价依据）
@@ -143,6 +145,7 @@ public class OrderServiceImpl implements OrderService {
                 .recipientPhone(request.getReceiverAddress().getPhone())
                 .detailedAddress(request.getReceiverAddress().getDetailedAddress())
                 .remark(request.getRemark())
+                .queryTokenHash(QueryTokens.hash(queryToken))
                 .createdAt(now)
                 .build();
         try {
@@ -163,7 +166,7 @@ public class OrderServiceImpl implements OrderService {
 
         log.info("[order] checkout success orderNo={}, amount={}, tenantId={}",
                 orderNo, totalAmount, tenantId);
-        return toResponse(order);
+        return toResponse(order, queryToken);
     }
 
     /** 既有订单是否可直接回放（非终态失败/已取消订单即可） */
@@ -171,8 +174,8 @@ public class OrderServiceImpl implements OrderService {
         return status != null && status != OrderStatus.CANCELLED;
     }
 
-    /** 组装响应：下单成功 status=STOCK_CONFIRMED，expireTime = 创建时刻 + 支付超时 */
-    private OrderCheckoutResponse toResponse(Order order) {
+    /** 组装响应：下单成功 status=STOCK_CONFIRMED，expireTime = 创建时刻 + 支付超时。 */
+    private OrderCheckoutResponse toResponse(Order order, String queryToken) {
         LocalDateTime createdAt = order.getCreatedAt() != null ? order.getCreatedAt() : LocalDateTime.now();
         long expireTime = createdAt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
                 + PAYMENT_TIMEOUT_MILLIS;
@@ -181,6 +184,7 @@ public class OrderServiceImpl implements OrderService {
                 .totalAmount(order.getTotalAmount())
                 .status(order.getStatus().name())
                 .expireTime(expireTime)
+                .queryToken(queryToken)
                 .build();
     }
 

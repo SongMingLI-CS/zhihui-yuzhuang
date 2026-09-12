@@ -2,6 +2,7 @@ package com.yuzhuang.order.service;
 
 import com.yuzhuang.order.dto.PaymentSandboxPayRequest;
 import com.yuzhuang.order.dto.PaymentSandboxResponse;
+import com.yuzhuang.order.dto.OrderSummaryResponse;
 
 /**
  * 订单支付与超时关单领域服务。
@@ -34,4 +35,16 @@ public interface OrderPaymentClosureService {
      * @return 实际关闭并回补库存的订单数
      */
     int closeExpiredOrders(int limit);
+
+    /**
+     * 主动取消未支付订单（阶段 E）：STOCK_CONFIRMED 且未支付 → CANCELLED，
+     * 同一事务内按明细回补库存并写 Outbox 事件；条件状态门保证并发下仅一次生效。
+     *
+     * @param tenantId 租户标识（来自 JWT）
+     * @param orderNo  业务订单号
+     * @param reason   取消原因（可空）
+     * @return 取消后的订单摘要
+     * @throws com.yuzhuang.common.exception.BusinessException 订单不存在 A1004；已支付/已关闭 B2003
+     */
+    OrderSummaryResponse cancelOrder(String tenantId, String orderNo, String reason);
 }

@@ -17,6 +17,11 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
 
+# 本地开发显式启用演示账号自举（admin/coop001/farmer001），便于本地联调。
+yuzhuang:
+  demo:
+    enabled: ${DEMO_MODE:true}
+
 logging:
   level:
     com.yuzhuang: debug

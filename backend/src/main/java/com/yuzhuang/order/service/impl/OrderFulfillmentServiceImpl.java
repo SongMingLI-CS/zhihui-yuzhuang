@@ -14,6 +14,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+
 /**
  * 订单履约写服务实现。
  *
@@ -107,6 +109,39 @@ public class OrderFulfillmentServiceImpl implements OrderFulfillmentService {
                 .fulfillmentStatus(order.getFulfillmentStatus().name())
                 .recipientName(order.getRecipientName())
                 .createdAt(order.getCreatedAt())
+                .carrier(order.getCarrier())
+                .trackingNo(order.getTrackingNo())
+                .shippedAt(order.getShippedAt())
                 .build();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public OrderSummaryResponse shipOrder(String tenantId, String orderNo, String carrier, String trackingNo) {
+        OrderSummaryResponse summary = transition(tenantId, orderNo,
+                FulfillmentStatus.READY, FulfillmentStatus.SHIPPED, "出库");
+        boolean hasCarrier = carrier != null && !carrier.isBlank();
+        boolean hasTracking = trackingNo != null && !trackingNo.isBlank();
+        if (hasCarrier || hasTracking) {
+            String tenant = TenantContext.normalizeTenantId(tenantId);
+            LocalDateTime shippedAt = LocalDateTime.now();
+            Order update = new Order();
+            if (hasCarrier) {
+                update.setCarrier(carrier.trim());
+            }
+            if (hasTracking) {
+                update.setTrackingNo(trackingNo.trim());
+            }
+            update.setShippedAt(shippedAt);
+            orderMapper.update(update, new LambdaUpdateWrapper<Order>()
+                    .eq(Order::getTenantId, tenant)
+                    .eq(Order::getOrderNo, orderNo.trim()));
+            summary.setCarrier(hasCarrier ? carrier.trim() : null);
+            summary.setTrackingNo(hasTracking ? trackingNo.trim() : null);
+            summary.setShippedAt(shippedAt);
+            log.info("[order] ship with logistics orderNo={}, carrier={}, trackingNo={}",
+                    orderNo, summary.getCarrier(), summary.getTrackingNo());
+        }
+        return summary;
     }
 }

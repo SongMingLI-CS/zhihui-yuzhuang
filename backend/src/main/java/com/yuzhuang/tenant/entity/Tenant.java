@@ -40,6 +40,12 @@ public class Tenant {
     /** 状态：ACTIVE 启用 / DISABLED 停用 */
     private String status;
 
+    /** 租户类型：VILLAGE 村 / COOPERATIVE 合作社 / PLATFORM 平台 */
+    private String tenantType;
+
+    /** 上级行政区域（政府聚合范围解析用） */
+    private String parentRegion;
+
     /** 创建时间 */
     private LocalDateTime createdAt;
 }
