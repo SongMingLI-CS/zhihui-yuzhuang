@@ -77,7 +77,7 @@ H2 测试 schema（`backend/src/test/resources/schema-test.sql`）已同步新�
 
 | 套件 | 命令 | 结果 |
 |---|---|---|
-| backend | `cd backend && mvn test` | **157 tests, 0 failures, 0 errors**（基线 99 → 新增 58；详见第 10.5 节） |
+| backend | `cd backend && mvn test` | **162 tests, 0 failures, 0 errors**（基线 99 → 新增 63；详见第 10.5 / 11.4 节） |
 | ai-service（离线） | `cd ai-service && python -m pytest tests/ -q --ignore=tests/test_qa_flow.py --ignore=tests/test_rag_hybrid.py` | **35 passed**（鉴权 6、AI 能力/降级边界 11、文档加载校验 11、营销审批状态机 5、营销链路 2 等） |
 | ai-service（全量，需 PostgreSQL/pgvector） | `python -m pytest` | 未在本机全量执行：`test_qa_flow.py` / `test_rag_hybrid.py` 依赖本地 pgvector 实例（基线审计记录为“长时间不结束”）。已补齐鉴权与用例，但**不宣称全量通过** |
 | web | `npm run typecheck` / `npm run lint` / `npm test` / `npm run build` | typecheck ✅、lint ✅（0 warnings/errors）、vitest **2 passed**、build ✅（14 路由，含新增 `/change-password`、`/gov`、`/merchant`、`/platform`） |
@@ -258,3 +258,58 @@ H2 测试 schema（`backend/src/test/resources/schema-test.sql`）已同步新�
 - 政府大屏真实 SSE/WebSocket 事件流（模拟卡片仍为生产隐藏状态）。
 - RAG 评测集与门槛、来源可核验资料导入流程、Playwright E2E、k6 压测、
   容器全栈启动与安全越权端到端演练、移动端（`mobile/`）。
+
+## 11. 第四批（真实事件流、订单列表、RAG 评测、压测/E2E 脚本）
+
+### 11.1 真实业务事件流（阶段 D，验收项 11 ✅）
+
+- 新增 `GET /api/v1/events/recent`（按 id 游标轮询，JSON）与
+  `GET /api/v1/events/stream`（SSE，5 分钟自动断开后由浏览器重连，含心跳注释帧）。
+- 数据源为 `t_outbox_event`（订单创建/支付/取消事件与订单同事务落库）→ **真实事件，非模拟**。
+- 范围由 **服务端** 依据已验证主体推导：平台管理员=全域；政府=其 `t_gov_scope` 授权租户；
+  村委/合作社=仅本租户；无可见范围直接返回空（不查库）。
+- Web 大屏新增「业务事件流（真实数据）」卡片（SSE 优先 + 15s 轮询兜底，断线状态可视化）；
+  原客户端模拟卡片仅在 `NEXT_PUBLIC_SIMULATED_REALTIME_FEED=true` 时作为演练保留并明确标注。
+- 哨兵：`GET /api/v1/events/**` 纳入端点策略（FARMER 403、匿名 401）。
+
+### 11.2 H5 订单列表（阶段 E）
+
+- 新增 `POST /api/v1/orders/guest/list`（匿名，单次 ≤20 笔）：逐条校验「订单号 + 查询凭证」，
+  仅返回校验通过的**脱敏**摘要；未通过条目 `valid=false`（不区分不存在/凭证错误）。
+- H5 订单中心新增「我的订单（本机记录）」列表（批量加载 + 刷新 + 点选查看详情/取消）。
+
+### 11.3 RAG 评测集与门槛（阶段 F）
+
+- `ai-service/app/eval/rag_eval.py`：纯函数指标 —— `recall@k`、引用存在率、拒答正确率、
+  跨租户泄漏率，以及门槛判定（不达标给出失败原因）。
+- `ai-service/data/eval/rag_eval_set.jsonl`：6 条用例（含 2 条**应拒答**用例，防止编造）。
+- `ai-service/scripts/eval_rag.py`：连库取数 → 计算指标 → 非零退出码表示未达门槛。
+- **资料来源清单** `ai-service/data/raw_docs/sources.json`：未核验资料强制标注 `note`，
+  并有单测校验清单结构（核验后须补 publisher/sourceUrl/issuedDate）。
+- 新增离线单测 7 例（评测集结构、指标取值、门槛通过/失败、跨租户泄漏、清单校验）。
+
+### 11.4 阶段 H 脚本（已提供，未执行）
+
+- `scripts/loadtest/checkout.js` + `scripts/loadtest/README.md`：k6 三场景
+  （同键幂等 / 并发防超卖 / 登录限流）+ 判定标准；文档**不含任何吞吐量数字**。
+- `web/e2e/roles-and-session.spec.ts`：未登录守卫重定向、登录失败提示、
+  合作社→`/b/merchant` 且无治理入口、政府→`/b/gov` 只读无写按钮、过期会话回登录页。
+- 仍需人工/CI 执行：`docker compose up` 全栈、Playwright 运行、k6 运行。
+
+### 11.5 第四批测试结果
+
+| 套件 | 命令 | 结果 |
+|---|---|---|
+| backend | `mvn test` | **162 tests, 0 failures, 0 errors**（新增事件流 4、订单列表 1 等） |
+| ai-service（离线） | `pytest tests/ -q --ignore=test_qa_flow.py --ignore=test_rag_hybrid.py` | **42 passed**（新增评测逻辑 7） |
+| web | `typecheck` / `lint` / `build` | 通过（新增 LiveEventFeed 参与构建） |
+| h5 | `typecheck` / `lint` / `test` / `build` | 通过（订单列表参与构建） |
+| api-spec | `yaml.safe_load` | ✅ 合法，**41 条 path** |
+
+### 11.6 第四批后仍未完成
+
+- **支付**与**媒体**（按用户指令保留，见第 9.6 节）。
+- 政府**订单级下钻**（含联系人）与 xlsx 导出；H5 购物车/多 SKU、售后申请；快递轨迹查询。
+- RAG 离线评测集的**官方资料核验**（须外部提供文件与发文号）。
+- 容器全栈启动演练、Playwright/k6 **实际执行**、移动端（`mobile/`）、
+  `docs/audit-verification.md` 等若干部文档回填。

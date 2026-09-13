@@ -946,6 +946,64 @@ paths:
         '503': { description: 渠道未配置（C5003） }
 
 
+  # ============================================================
+  # 第四批：真实事件流（Outbox）、订单中心列表
+  # ============================================================
+  /events/recent:
+    get:
+      tags: [事件流]
+      summary: 按游标拉取真实业务事件（JSON 轮询；数据来自 Outbox）
+      description: 需 JWT；角色限 VILLAGE/COOPERATIVE/GOVERNMENT/PLATFORM_ADMIN；范围由服务端按主体与政府授权范围推导（村委=本租户、政府=授权范围、平台=全域）。
+      parameters:
+        - in: query
+          name: afterId
+          schema: { type: integer, format: int64 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 30, maximum: 200 }
+      responses:
+        '200': { description: 事件列表（按 id 升序，含中文摘要） }
+        '403': { description: 角色无权（A1003） }
+  /events/stream:
+    get:
+      tags: [事件流]
+      summary: 真实业务事件 SSE 流（5 分钟自动断开，浏览器自动重连）
+      description: 需 JWT（B 端同源 Cookie 会话或 Bearer）；事件与订单同事务落库，非客户端模拟。
+      responses:
+        '200':
+          description: "text/event-stream（event 名 event，data 为 EventItem JSON）"
+          content:
+            text/event-stream:
+              schema: { type: string }
+        '403': { description: 角色无权（A1003） }
+  /orders/guest/list:
+    post:
+      tags: [订单查询（匿名）]
+      summary: 批量查询本人订单（订单中心列表；单次上限 20 笔）
+      security: []
+      description: 逐条校验「订单号 + 查询凭证」；仅返回校验通过的脱敏摘要，未通过条目 valid=false（不区分不存在/凭证错误）。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  maxItems: 20
+                  items:
+                    type: object
+                    required: [orderNo, queryToken]
+                    properties:
+                      orderNo: { type: string, maxLength: 64 }
+                      queryToken: { type: string, maxLength: 128 }
+      responses:
+        '200': { description: 批量结果（含 valid 标记） }
+        '400': { description: 参数错误或超过 20 笔（A1001） }
+
+
 components:
   securitySchemes:
     BearerAuth:
