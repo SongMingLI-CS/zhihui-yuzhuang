@@ -184,6 +184,46 @@ class OrderLifecycleContractTest extends WebAuthTestSupport {
     }
 
     @Test
+    void guestList_returnsOnlyVerifiedOrders() throws Exception {
+        String tokenA = "guest-list-token-aaa";
+        String tokenB = "guest-list-token-bbb";
+        Order o1 = seedOrder("ORD-LIST-1", OrderStatus.PROCESSING, FulfillmentStatus.SHIPPED);
+        Order o2 = seedOrder("ORD-LIST-2", OrderStatus.CANCELLED, FulfillmentStatus.PENDING);
+        for (Order o : new Order[]{o1, o2}) {
+            Order patch = new Order();
+            patch.setId(o.getId());
+            patch.setQueryTokenHash(QueryTokens.hash(o.getOrderNo().equals("ORD-LIST-1") ? tokenA : tokenB));
+            orderMapper.updateById(patch);
+        }
+
+        mockMvc.perform(post("/api/v1/orders/guest/list")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"items\":["
+                                + "{\"orderNo\":\"ORD-LIST-1\",\"queryToken\":\"" + tokenA + "\"},"
+                                + "{\"orderNo\":\"ORD-LIST-2\",\"queryToken\":\"wrong-token\"}]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("00000"))
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].orderNo").value("ORD-LIST-1"))
+                .andExpect(jsonPath("$.data[0].valid").value(true))
+                .andExpect(jsonPath("$.data[0].order.status").value("PROCESSING"))
+                .andExpect(jsonPath("$.data[1].orderNo").value("ORD-LIST-2"))
+                .andExpect(jsonPath("$.data[1].valid").value(false));
+
+        // 超过上限：400
+        StringBuilder tooMany = new StringBuilder("{\"items\":[");
+        for (int i = 0; i < 21; i++) {
+            if (i > 0) tooMany.append(',');
+            tooMany.append("{\"orderNo\":\"X").append(i).append("\",\"queryToken\":\"t\"}");
+        }
+        tooMany.append("]}");
+        mockMvc.perform(post("/api/v1/orders/guest/list")
+                        .contentType(MediaType.APPLICATION_JSON).content(tooMany.toString()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("A1001"));
+    }
+
+    @Test
     void govCsvExport_platformAdminAllowed_villageForbidden() throws Exception {
         mockMvc.perform(get("/api/v1/gov/export")
                         .header(HeaderNames.AUTHORIZATION, bearer("PLATFORM_ADMIN", "tenant_platform_000")))

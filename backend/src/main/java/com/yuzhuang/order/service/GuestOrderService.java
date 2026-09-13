@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yuzhuang.common.enums.ResultCode;
 import com.yuzhuang.common.exception.BusinessException;
 import com.yuzhuang.order.dto.GuestOrderCancelRequest;
+import com.yuzhuang.order.dto.GuestOrderListEntry;
+import com.yuzhuang.order.dto.GuestOrderListRequest;
 import com.yuzhuang.order.dto.GuestOrderLookupRequest;
 import com.yuzhuang.order.dto.GuestOrderLookupResponse;
 import com.yuzhuang.order.entity.Order;
@@ -14,6 +16,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 匿名本人订单查询（阶段 E）。
@@ -51,6 +55,32 @@ public class GuestOrderService {
                 request.getReason());
         Order latest = orderMapper.selectById(order.getId());
         return toResponse(latest);
+    }
+
+    /**
+     * 批量查询本人订单（订单中心列表）：逐条校验凭证，仅返回校验通过的脱敏摘要；
+     * 未通过的条目以 {@code valid=false} 回显（原因统一为“订单不存在或凭证不正确”）。
+     */
+    public List<GuestOrderListEntry> list(GuestOrderListRequest request) {
+        List<GuestOrderListEntry> result = new ArrayList<>();
+        for (GuestOrderLookupRequest item : request.getItems()) {
+            String orderNo = item.getOrderNo() == null ? "" : item.getOrderNo().trim();
+            try {
+                Order order = requireByToken(orderNo, item.getQueryToken());
+                result.add(GuestOrderListEntry.builder()
+                        .orderNo(order.getOrderNo())
+                        .valid(true)
+                        .order(toResponse(order))
+                        .build());
+            } catch (BusinessException ex) {
+                result.add(GuestOrderListEntry.builder()
+                        .orderNo(orderNo)
+                        .valid(false)
+                        .error("订单不存在或查询凭证不正确")
+                        .build());
+            }
+        }
+        return result;
     }
 
     /** 凭证校验（订单号 + 一次性凭证）；不通过统一 404，避免订单号枚举。 */

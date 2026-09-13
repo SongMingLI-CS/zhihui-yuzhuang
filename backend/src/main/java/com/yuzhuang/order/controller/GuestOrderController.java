@@ -2,6 +2,8 @@ package com.yuzhuang.order.controller;
 
 import com.yuzhuang.common.api.ApiResponse;
 import com.yuzhuang.order.dto.GuestOrderCancelRequest;
+import com.yuzhuang.order.dto.GuestOrderListEntry;
+import com.yuzhuang.order.dto.GuestOrderListRequest;
 import com.yuzhuang.order.dto.GuestOrderLookupRequest;
 import com.yuzhuang.order.dto.GuestOrderLookupResponse;
 import com.yuzhuang.order.service.GuestOrderService;
@@ -13,6 +15,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * 匿名本人订单查询接口（阶段 E，公开端点）。
@@ -39,6 +43,14 @@ public class GuestOrderController {
             @Valid @RequestBody GuestOrderLookupRequest request) {
         log.debug("[guest-lookup] orderNo={}", request.getOrderNo());
         return ApiResponse.success(guestOrderService.lookup(request));
+    }
+
+    @Operation(summary = "批量查询本人订单（订单中心列表；仅返回凭证校验通过的脱敏摘要）")
+    @PostMapping("/orders/guest/list")
+    public ApiResponse<List<GuestOrderListEntry>> list(
+            @Valid @RequestBody GuestOrderListRequest request) {
+        log.debug("[guest-list] count={}", request.getItems().size());
+        return ApiResponse.success(guestOrderService.list(request));
     }
 
     @Operation(summary = "本人取消未支付订单（需订单号 + 查询凭证；含库存回补）")

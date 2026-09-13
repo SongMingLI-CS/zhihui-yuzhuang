@@ -73,6 +73,7 @@ public class EndpointSecurityPolicy {
             new Rule("GET", "/api/v1/shops/**", Access.PUBLIC, EMPTY),
             // ---------- 消费者订单查询凭证（仅凭订单号 + 查询口令；服务层校验，见阶段 E）
             new Rule("POST", "/api/v1/orders/guest/lookup", Access.PUBLIC, EMPTY),
+            new Rule("POST", "/api/v1/orders/guest/list", Access.PUBLIC, EMPTY),
             new Rule("POST", "/api/v1/orders/guest/cancel", Access.PUBLIC, EMPTY),
             // 外部渠道回调（由渠道签名认证，非 JWT；未配置渠道返回 503/C5003）
             new Rule("POST", "/api/v1/channels/*/notify", Access.PUBLIC, EMPTY),
@@ -83,6 +84,9 @@ public class EndpointSecurityPolicy {
 
             // ---------- 经营大盘（农户不可读）----------
             new Rule("GET", "/api/v1/dashboard/summary", Access.ROLES, DASHBOARD),
+            // ---------- 真实业务事件流（Outbox；范围由服务端按主体推导）----------
+            new Rule("GET", "/api/v1/events/recent", Access.ROLES, DASHBOARD),
+            new Rule("GET", "/api/v1/events/stream", Access.ROLES, DASHBOARD),
 
             // ---------- 商品管理写（商家/村委/平台）----------
             new Rule("POST", "/api/v1/products", Access.ROLES, OPS),

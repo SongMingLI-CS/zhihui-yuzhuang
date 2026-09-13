@@ -8,6 +8,7 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -92,4 +93,31 @@ public interface OutboxEventMapper extends BaseMapper<OutboxEvent> {
             + "SET status = 'PROCESSED', claimed_at = NULL, lease_until = NULL, instance_id = NULL "
             + "WHERE id = #{id} AND status IN ('PUBLISHED', 'PENDING')")
     int markProcessed(@Param("id") Long id);
+
+    /**
+     * 按 id 游标拉取真实事件（阶段 D：大屏/工作台真实事件流）。
+     *
+     * <p>数据源即 Outbox 发件箱，事件与订单同事务落库，因此是「真实业务事件」而非客户端模拟。
+     * 租户范围由服务端按已验证主体推导：{@code tenantIds} 为 {@code null} 表示全域
+     * （仅平台管理员），为空集合时由服务层直接返回空列表（不查库）。
+     *
+     * @param tenantIds 可见租户集合（null=全域）
+     * @param afterId   只取 id 大于该值的事件（首次可传 null）
+     * @param limit     单次上限
+     * @return 事件列表（按 id 升序）
+     */
+    @Select("<script>"
+            + "SELECT id, tenant_id, aggregate_type, aggregate_id, event_type, payload, status, "
+            + "retry_count, created_at FROM t_outbox_event "
+            + "<where>"
+            + "  <if test='tenantIds != null'> tenant_id IN "
+            + "    <foreach item='t' collection='tenantIds' open='(' separator=',' close=')'>#{t}</foreach>"
+            + "  </if>"
+            + "  <if test='afterId != null'> AND id &gt; #{afterId} </if>"
+            + "</where>"
+            + " ORDER BY id ASC LIMIT #{limit}"
+            + "</script>")
+    List<OutboxEvent> selectEventsAfter(@Param("tenantIds") Collection<String> tenantIds,
+                                        @Param("afterId") Long afterId,
+                                        @Param("limit") int limit);
 }
