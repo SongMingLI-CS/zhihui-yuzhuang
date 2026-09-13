@@ -250,6 +250,20 @@ export interface AdminUser {
 
 /* ===================== 政府治理（GET /api/v1/gov/summary） ===================== */
 
+/* ===================== 真实业务事件流（/api/v1/events） ===================== */
+
+export interface EventItem {
+  id: number;
+  tenantId: string;
+  eventType: string;
+  aggregateId: string;
+  summary: string;
+  status: string;
+  createdAt: string | null;
+  payload: string;
+}
+
+
 /* ===================== 营销任务台账与审批（/ai/v1/marketing/tasks） ===================== */
 
 export type MarketingReviewStatus = 'PENDING_HUMAN_REVIEW' | 'APPROVED' | 'REJECTED';

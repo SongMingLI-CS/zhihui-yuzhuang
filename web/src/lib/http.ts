@@ -27,6 +27,7 @@ import type {
   MarketingTaskPage,
   MarketingTaskItem,
   MarketingReviewStatus,
+  EventItem,
 } from './types';
 
 /** 业务/网络错误统一封装（携带契约 code 与 HTTP 状态） */
@@ -373,7 +374,24 @@ export async function resetAdminUserPassword(userId: number): Promise<{
   return unwrap(res);
 }
 
+/* ===================== 真实业务事件流（/api/v1/events） ===================== */
+
+/** 按游标拉取真实业务事件（Outbox）。 */
+export async function fetchRecentEvents(
+  afterId?: number | null,
+  limit = 30,
+): Promise<EventItem[]> {
+  const res = await http.get<ApiResponse<EventItem[]>>(`${API_BASE}/events/recent`, {
+    params: { afterId: afterId ?? undefined, limit },
+  });
+  return unwrap(res);
+}
+
+/** 真实事件 SSE 地址（B 端同源 Cookie 会话自动携带）。 */
+export const EVENT_STREAM_URL = `${API_BASE}/events/stream`;
+
 /* ===================== 营销任务台账与审批（/ai/v1/marketing/tasks） ===================== */
+
 
 /** 分页查询本租户营销任务台账（含审批状态/审批人/发布时间）。 */
 export async function listMarketingTasks(

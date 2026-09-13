@@ -98,6 +98,14 @@ export interface GuestOrderLookupResponse {
   createdAt?: number | null;
 }
 
+/** 批量本人订单查询的单条结果（valid=false 表示凭证未通过） */
+export interface GuestOrderListEntry {
+  orderNo: string;
+  valid: boolean;
+  error?: string | null;
+  order?: GuestOrderLookupResponse | null;
+}
+
 /* ===================== 农技问答（POST /ai/v1/qa/ask） ===================== */
 
 export type AgriCategory = 'DISEASE_PEST' | 'FERTILIZER' | 'POLICY' | 'GENERAL';

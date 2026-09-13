@@ -5,6 +5,7 @@ import type {
   AgriQAResponse,
   ApiResponse,
   GuestOrderCancelRequest,
+  GuestOrderListEntry,
   GuestOrderLookupRequest,
   GuestOrderLookupResponse,
   OrderCheckoutRequest,
@@ -156,6 +157,19 @@ export async function lookupGuestOrder(
     `${API_BASE}/orders/guest/lookup`,
     payload,
     { timeout: 15000 },
+  );
+  return unwrap(res);
+}
+
+/** 批量查询本人订单（订单中心列表；仅校验通过的返回脱敏摘要）。 */
+export async function listGuestOrders(
+  items: Array<{ orderNo: string; queryToken: string }>,
+): Promise<GuestOrderListEntry[]> {
+  if (items.length === 0) return [];
+  const res = await http.post<ApiResponse<GuestOrderListEntry[]>>(
+    `${API_BASE}/orders/guest/list`,
+    { items: items.slice(0, 20) },
+    { timeout: 20000 },
   );
   return unwrap(res);
 }

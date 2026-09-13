@@ -19,6 +19,7 @@ import { MetricCard } from '@/components/dashboard/MetricCard';
 import { TrendChart } from '@/components/dashboard/TrendChart';
 import { SalesShareChart } from '@/components/dashboard/SalesShareChart';
 import { RealtimeFeed } from '@/components/dashboard/RealtimeFeed';
+import { LiveEventFeed } from '@/components/dashboard/LiveEventFeed';
 import { SIMULATED_REALTIME_FEED } from '@/lib/config';
 import { fetchDashboardSummary } from '@/lib/http';
 import { formatDate, formatInt, formatYuan } from '@/lib/format';
@@ -131,13 +132,24 @@ export default function DashboardPage() {
           <SalesShareChart data={salesShare} height={210} />
         </Card>
 
-        {/* 事件流水：仅当显式开启模拟才展示（生产默认隐藏，避免把模拟标为“实时”） */}
+        {/* 真实业务事件流：数据来自后端 Outbox（SSE + 轮询兜底），范围由服务端按角色推导 */}
+        <Card
+          className="col-span-12 md:col-span-6 xl:col-span-12"
+          icon={<Radio size={16} />}
+          title="业务事件流（真实数据）"
+          subtitle="订单创建/支付/取消事件与订单同事务落库，经 SSE 实时推送（断线自动降级为 15s 轮询）"
+          bodyClassName="p-0"
+        >
+          <LiveEventFeed />
+        </Card>
+
+        {/* 演练用模拟流水：仅在显式开启时展示，并明确标注为模拟（不代表真实经营流水） */}
         {SIMULATED_REALTIME_FEED ? (
           <Card
             className="col-span-12 md:col-span-6 xl:col-span-12"
             icon={<Radio size={16} />}
-            title="事件流水（演示：客户端模拟，非生产实时）"
-            subtitle="未接入后端 SSE/WebSocket 事件流前，本卡片仅为交互演示，不代表真实经营流水"
+            title="事件流水（演练模拟，非实时）"
+            subtitle="仅用于交互演练；真实事件请见上方「业务事件流」卡片"
             bodyClassName="p-0"
           >
             <RealtimeFeed baseline={FEED_TPS} onStats={handleFeedStats} />

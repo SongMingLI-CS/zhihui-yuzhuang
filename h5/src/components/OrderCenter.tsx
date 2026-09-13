@@ -1,13 +1,14 @@
-import { useState } from 'react';
-import { ClipboardList, Loader2, PackageSearch } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { ClipboardList, Loader2, PackageSearch, RefreshCw } from 'lucide-react';
 import {
   cancelGuestOrder,
+  listGuestOrders,
   listOrderCredentials,
   lookupGuestOrder,
   removeOrderCredential,
   toApiError,
 } from '../lib/http';
-import type { GuestOrderLookupResponse } from '../types/api';
+import type { GuestOrderListEntry, GuestOrderLookupResponse } from '../types/api';
 
 /**
  * 订单中心（阶段 E）：本人订单查询 / 物流状态 / 取消。
@@ -43,14 +44,38 @@ export default function OrderCenter() {
   const [orderNo, setOrderNo] = useState(stored[0]?.orderNo ?? '');
   const [queryToken, setQueryToken] = useState(stored[0]?.queryToken ?? '');
   const [result, setResult] = useState<GuestOrderLookupResponse | null>(null);
+  const [entries, setEntries] = useState<GuestOrderListEntry[]>([]);
+  const [listBusy, setListBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  /** 批量查询本机已保存凭证对应的订单（仅返回凭证校验通过者）。 */
+  const refreshList = useCallback(async () => {
+    const local = listOrderCredentials();
+    if (local.length === 0) {
+      setEntries([]);
+      return;
+    }
+    setListBusy(true);
+    try {
+      setEntries(await listGuestOrders(local));
+    } catch {
+      setEntries([]);
+    } finally {
+      setListBusy(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshList();
+  }, [refreshList]);
 
   const run = async (fn: () => Promise<GuestOrderLookupResponse>) => {
     setBusy(true);
     setError(null);
     try {
       setResult(await fn());
+      void refreshList();
     } catch (err) {
       setResult(null);
       setError(toApiError(err).message);
@@ -85,27 +110,55 @@ export default function OrderCenter() {
       </div>
 
       <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
-        {stored.length > 0 && (
-          <div className="mb-3 flex flex-wrap gap-1.5">
-            {stored.map((c) => (
+        {(entries.length > 0 || stored.length > 0) && (
+          <div className="mb-3">
+            <div className="mb-1.5 flex items-center gap-2">
+              <span className="text-[11px] font-medium text-slate-600">我的订单（本机记录）</span>
               <button
-                key={c.orderNo}
                 type="button"
-                onClick={() => {
-                  setOrderNo(c.orderNo);
-                  setQueryToken(c.queryToken);
-                  setResult(null);
-                  setError(null);
-                }}
-                className={`h-7 rounded-lg border px-2 text-[11px] transition ${
-                  orderNo === c.orderNo
-                    ? 'border-green-300 bg-green-50 text-green-700'
-                    : 'border-slate-200 bg-white text-slate-600'
-                }`}
+                onClick={() => void refreshList()}
+                disabled={listBusy}
+                className="ml-auto inline-flex h-6 items-center gap-1 rounded-md border border-slate-200 px-2 text-[10px] text-slate-600 disabled:opacity-50"
               >
-                {c.orderNo}
+                {listBusy ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />}
+                刷新
               </button>
-            ))}
+            </div>
+            <ul className="space-y-1">
+              {(entries.length > 0 ? entries : stored.map((c) => ({
+                orderNo: c.orderNo,
+                valid: true,
+                order: null,
+                error: null,
+              }))).map((entry) => (
+                <li key={entry.orderNo}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const local = stored.find((c) => c.orderNo === entry.orderNo);
+                      setOrderNo(entry.orderNo);
+                      setQueryToken(local?.queryToken ?? '');
+                      setResult(entry.order ?? null);
+                      setError(null);
+                    }}
+                    className={`flex w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-left transition ${
+                      orderNo === entry.orderNo
+                        ? 'border-green-300 bg-green-50'
+                        : 'border-slate-200 bg-white'
+                    }`}
+                  >
+                    <span className="min-w-0 flex-1 truncate text-[11px] text-slate-700">
+                      {entry.orderNo}
+                    </span>
+                    <span className="shrink-0 text-[10px] text-slate-500">
+                      {entry.valid
+                        ? STATUS_LABELS[entry.order?.status ?? ''] ?? entry.order?.status ?? '—'
+                        : (entry.error ?? '凭证无效')}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 
