@@ -1,0 +1,32 @@
+{
+  "_comment": "知识资料来源清单（阶段 F）。verified=false 表示来源尚未核验：仅可用于检索链路演示，不得作为官方政策/农技依据。核验后请补齐 publisher/sourceUrl/issuedDate 并置 verified=true。",
+  "documents": [
+    {
+      "file": "yuzhuang_wheat_guide.txt",
+      "title": "于庄小麦种植指南",
+      "publisher": "",
+      "sourceUrl": "",
+      "issuedDate": "",
+      "verified": false,
+      "note": "样例资料：由项目自行整理，尚未取得官方发布方与发文号，待核验。"
+    },
+    {
+      "file": "luyi_wheat_pest_control_2026.txt",
+      "title": "鹿邑县小麦常见病虫草害防控要点",
+      "publisher": "",
+      "sourceUrl": "",
+      "issuedDate": "",
+      "verified": false,
+      "note": "样例资料：标题含“鹿邑县”但尚无官方文件编号与发布链接，待核验后方可作为政策依据。"
+    },
+    {
+      "file": "luyi_subsidy_policy_2026.txt",
+      "title": "鹿邑县惠农补贴政策汇编",
+      "publisher": "",
+      "sourceUrl": "",
+      "issuedDate": "",
+      "verified": false,
+      "note": "样例资料：补贴标准与申领条件可能随时间变化，必须核验当年官方文件后再用于问答。"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+# RAG 评测集（阶段 F）
+#
+# 每行一个用例（JSONL）：
+#   query              提问（中文自然语言）
+#   expectedDocTitles  期望命中的文档标题（入库时的 doc_title，即文件名去扩展名）
+#   expectAnswer       知识库应有依据 → true；应拒答（无依据）→ false
+#   tenantId           检索使用的租户域（用于跨租户隔离校验）
+#   note               备注（来源是否可核验等）
+#
+# ⚠️ 重要说明：当前样例知识库（ai-service/data/raw_docs/*.txt）的**来源尚未核验**，
+# 因此本评测集只用于「检索链路与指标」回归，**不得**当作官方资料正确性验证。
+# 待导入可核验来源（见 data/raw_docs/sources.json）后，需扩充并复核本评测集。
+{"query": "于庄小麦返青期应该如何追肥？", "expectedDocTitles": ["yuzhuang_wheat_guide"], "expectAnswer": true, "tenantId": "global", "note": "样例资料，来源待核验"}
+{"query": "冬小麦常见真菌病害如何防治？", "expectedDocTitles": ["yuzhuang_wheat_guide"], "expectAnswer": true, "tenantId": "global", "note": "样例资料，来源待核验"}
+{"query": "鹿邑县有哪些惠农补贴政策？", "expectedDocTitles": ["luyi_subsidy_policy_2026"], "expectAnswer": true, "tenantId": "global", "note": "样例资料，来源待核验"}
+{"query": "小麦病虫害防治的关键时期是什么时候？", "expectedDocTitles": ["luyi_wheat_pest_control_2026"], "expectAnswer": true, "tenantId": "global", "note": "样例资料，来源待核验"}
+{"query": "如何申请农机购置补贴？", "expectedDocTitles": [], "expectAnswer": false, "tenantId": "global", "note": "知识库暂无该主题资料，应明确拒答而非编造"}
+{"query": "于庄村 2026 年光伏发电项目分红方案是什么？", "expectedDocTitles": [], "expectAnswer": false, "tenantId": "global", "note": "知识库无依据，应拒答"}
